@@ -1,0 +1,18 @@
+id: example-skill
+name: Example Skill
+version: 0.1.0
+spec_version: 1.0
+status: experimental
+maintainers:
+  - name: neuviletteflux
+    email: neuviletteflux@example.com
+description: |
+  A minimal example skill that demonstrates how a skill should be structured and run.
+tags: [example, demo]
+license: MIT
+language: python
+entrypoint: implementation/main.py
+dependencies: []
+compatibility:
+  models: ["gpt-4o", "gpt-4"]
+  runtimes: ["local"]
