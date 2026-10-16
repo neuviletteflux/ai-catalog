@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Skill metadata",
+  "type": "object",
+  "required": ["id", "name", "version", "spec_version", "status", "maintainers", "description"],
+  "properties": {
+    "id": {"type": "string"},
+    "name": {"type": "string"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "spec_version": {"type": "string"},
+    "status": {"type": "string", "enum": ["draft", "experimental", "stable", "deprecated"]},
+    "maintainers": {
+      "type": "array",
+      "items": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "email": {"type": "string"}}}
+    },
+    "description": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "license": {"type": "string"},
+    "language": {"type": "string"},
+    "entrypoint": {"type": "string"},
+    "dependencies": {"type": "array"},
+    "compatibility": {"type": "object"}
+  },
+  "additionalProperties": false
+}
