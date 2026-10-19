@@ -58,21 +58,30 @@ python3 scripts/validate_metadata.py
 
 ## 集成验证
 
-- 用同版本 `dsh web --port 19555 --no-open`（home 层 patch 指向本目录）启动临时实例：
-  `window.__DSH_BOOT__` 的 entries 包含 `dsh-primary-session`，客户端 bundle 由
-  `/plugins` 正常提供。
+- 从 GitHub 以 Profile Bundle 安装到 `web` profile：
+
+  ```bash
+  dsh plugin --profile web add 'github:neuviletteflux/ai-catalog#path:/plugins/dsh-primary-session'
+  dsh --profile web --dump-config   # 出现 id: primary-session
+  ```
+
+  `--dump-config` 能读到组合包 patch 的 `id: primary-session` 行；随后启动
+  `dsh web --port 19556 --no-open`，`window.__DSH_BOOT__` 的 entries 包含
+  `dsh-primary-session`，客户端 bundle 由 `/plugins` 正常提供。
 - 浏览器（Chrome headless）打开会话行菜单，实际渲染出「设为主会话」，位置在
   「置顶会话」之前，console 无插件报错（见 `assets/dsh-primary-session.png`）。
 - 验证过程为只读：只打开菜单与截图，没有点击会改写置顶集合的菜单项；置顶/取消的
   数据变更由单元测试用 fake `workspaces` 服务覆盖。
+- 验证后已清理 `web` profile 的测试安装。
 
-## 安装状态与互斥
+## 安装状态
 
-- 当前通过 home 层 patch 挂载：
-  `$DSH_HOME/cordis.patch.yml` → `id: dsh-primary-session`，路径指向本目录
-  `lib/index.js`。
-- 本包同时具备 Bundle 安装条件；改用「设置 → 插件 → 添加插件」后，必须删除同一
-  home patch 条目，否则同一包会从两个 Loader 来源解析，客户端模块组合报错。
+- `desktop` profile 已通过 GitHub spec 安装：
+  `dependencies["dsh-primary-session"] = github:neuviletteflux/ai-catalog#path:/plugins/dsh-primary-session`，
+  并加入 `dsh.profile.bundles`（锁定 commit `ac9d2d7`）。
+- home 层 patch 的绝对路径挂载已移除（原来的非插件方式已还原）。
+- 该依赖按 commit 锁定；后续更新代码后需要重新安装/更新 git 依赖，安装副本才会
+  跟随新 commit。安装与 home 层绝对路径挂载互斥，不要同时启用。
 
 ## 已知边界
 
