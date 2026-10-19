@@ -82,7 +82,7 @@ python3 scripts/validate_metadata.py
 
 - `desktop` profile 已通过 GitHub spec 安装：
   `dependencies["dsh-primary-session"] = github:neuviletteflux/ai-catalog#path:/plugins/dsh-primary-session`，
-  并加入 `dsh.profile.bundles`（锁定 commit `ac9d2d7`）。
+  并加入 `dsh.profile.bundles`（锁定 commit `8cc1cc7`）。
 - home 层 patch 的绝对路径挂载已移除（原来的非插件方式已还原）。
 - 该依赖按 commit 锁定；后续更新代码后需要重新安装/更新 git 依赖，安装副本才会
   跟随新 commit。安装与 home 层绝对路径挂载互斥，不要同时启用。
