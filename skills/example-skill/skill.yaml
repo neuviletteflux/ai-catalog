@@ -1,7 +1,7 @@
 id: example-skill
 name: Example Skill
 version: 0.1.0
-spec_version: 1.0
+spec_version: "1.0"
 status: experimental
 maintainers:
   - name: neuviletteflux
