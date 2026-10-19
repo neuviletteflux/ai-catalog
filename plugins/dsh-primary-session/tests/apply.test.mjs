@@ -6,7 +6,7 @@ import vm from "node:vm";
 
 const bundle = fs.readFileSync(path.join(import.meta.dirname, "..", "lib", "client.js"), "utf8");
 
-function loadBundle() {
+function loadBundle(badgeStyle) {
   let definition;
   const sandbox = {
     window: { __ModuleLoader__: { load: (value) => { definition = value; } } },
@@ -18,7 +18,8 @@ function loadBundle() {
     Map,
     Array,
     Error,
-    String
+    String,
+    localStorage: badgeStyle === undefined ? undefined : { getItem: () => badgeStyle }
   };
   vm.createContext(sandbox);
   vm.runInContext(bundle, sandbox);
@@ -187,4 +188,38 @@ test("badge marks only the most recently pinned session of a workspace", () => {
   assert.equal(render("a"), null);
   assert.equal(render("c"), null);
   assert.equal(render("b", { ...state, pinnedSessionIds: [] }), null);
+});
+
+test("badge style selection switches the rendered variant", () => {
+  const state = {
+    items: [{ workspaceId: "w1", sessionIds: ["a", "b"] }],
+    pinnedSessionIds: ["b"],
+    archivedSessionIds: []
+  };
+  const renderBadge = (style) => {
+    const mod = loadBundle(style);
+    const { ctx, getRegistrations } = fakeCtx(state, []);
+    mod.apply(ctx);
+    const { Component } = entryOf(getRegistrations(), "primary-badge");
+    return Component({
+      sessionId: "b",
+      t: (key) => key,
+      usePrimaryState: (selector) => selector(state)
+    });
+  };
+
+  const solid = renderBadge();
+  assert.equal(solid.type, "span");
+  assert.equal(solid.props.children[0], "badge.label");
+
+  const star = renderBadge("star");
+  assert.equal(star.type, "span");
+  assert.equal(star.props.children[0].type, "svg");
+
+  const bar = renderBadge("bar");
+  assert.equal(bar.type, "span");
+  assert.equal(bar.props.children[0], null);
+
+  const unknown = renderBadge("nope");
+  assert.equal(unknown.props.children[0], "badge.label");
 });

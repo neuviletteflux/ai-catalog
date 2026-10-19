@@ -155,8 +155,50 @@ window.__ModuleLoader__.load({
 			const first = pinnedIds.find((id) => !accounted.has(id));
 			return first === sessionId;
 		}
+		/** localStorage key selecting the badge visual; unknown values fall back to `solid`. */
+		const BADGE_STYLE_KEY = "dsh.primary.badge.style";
+		/** Supported badge styles, also used by the README preview sheet. */
+		const BADGE_STYLES = ["solid", "soft", "outline", "circle", "star", "bar"];
 		/**
-		 * Row-leading badge: a compact accent chip that marks the primary row.
+		 * Read the selected badge style. A storage failure (private mode, disabled
+		 * storage) must not break the row, so it falls back to the default.
+		 * @returns one of {@link BADGE_STYLES}.
+		 */
+		function badgeStyle() {
+			try {
+				const value = globalThis.localStorage?.getItem(BADGE_STYLE_KEY);
+				return BADGE_STYLES.includes(value) ? value : "solid";
+			} catch {
+				return "solid";
+			}
+		}
+		/** Accent color shared by every badge style (the sidebar's business accent). */
+		const ACCENT = "var(--dsw-alias-state-business-primary)";
+		/** Style fragments per badge variant; `star` and `bar` render no text. */
+		const BADGE_VARIANTS = {
+			solid: {
+				box: { width: "15px", height: "15px", borderRadius: "4px", background: ACCENT, color: "#fff" }
+			},
+			soft: {
+				box: { width: "15px", height: "15px", borderRadius: "4px", background: "color-mix(in srgb, " + ACCENT + " 16%, transparent)", color: ACCENT }
+			},
+			outline: {
+				box: { width: "15px", height: "15px", borderRadius: "4px", background: "transparent", color: ACCENT, border: "1px solid " + ACCENT }
+			},
+			circle: {
+				box: { width: "14px", height: "14px", borderRadius: "999px", background: ACCENT, color: "#fff" }
+			},
+			star: {
+				box: { width: "14px", height: "14px", background: "transparent", color: ACCENT }
+			},
+			bar: {
+				box: { width: "3px", height: "16px", borderRadius: "2px", background: ACCENT }
+			}
+		};
+		/**
+		 * Row-leading badge: a compact chip that marks the primary row. The visual
+		 * is selectable through `localStorage["dsh.primary.badge.style"]`
+		 * (`solid`, `soft`, `outline`, `circle`, `star`, `bar`).
 		 * The seat is only rendered while the row is idle (a running row shows its
 		 * status dot there instead); the trailing pin icon still marks it.
 		 * @param props - composed slot props (`t`, `usePrimaryState`).
@@ -166,6 +208,18 @@ window.__ModuleLoader__.load({
 			const { sessionId, t, usePrimaryState } = props;
 			const snapshot = usePrimaryState((state) => state);
 			if (!isPrimaryOf(snapshot, sessionId)) return null;
+			const style = BADGE_VARIANTS[badgeStyle()] ?? BADGE_VARIANTS.solid;
+			const children = style === BADGE_VARIANTS.star
+				? React.createElement("svg", {
+					width: 14,
+					height: 14,
+					viewBox: "0 0 16 16",
+					"aria-hidden": true,
+					fill: "currentColor"
+				}, React.createElement("path", { d: "M8 1.6l1.92 4.03 4.42.55-3.25 3.05.84 4.37L8 11.5l-3.93 2.1.84-4.37L1.66 6.18l4.42-.55z" }))
+				: style === BADGE_VARIANTS.bar
+					? null
+					: t("badge.label");
 			return React.createElement("span", {
 				role: "img",
 				"aria-label": t("badge.aria"),
@@ -174,17 +228,13 @@ window.__ModuleLoader__.load({
 					display: "inline-flex",
 					alignItems: "center",
 					justifyContent: "center",
-					width: "15px",
-					height: "15px",
-					borderRadius: "4px",
-					background: "var(--dsw-alias-state-business-primary)",
-					color: "#fff",
 					fontSize: "10px",
 					fontWeight: 600,
 					lineHeight: "15px",
-					flex: "none"
+					flex: "none",
+					...style.box
 				}
-			}, t("badge.label"));
+			}, children);
 		}
 		/** Required client services. */
 		const inject = ["slots", "workspaces", "locale"];
