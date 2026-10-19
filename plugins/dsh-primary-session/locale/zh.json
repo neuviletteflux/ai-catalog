@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "主会话 (dsh-primary-session)",
+    "title": "设为主会话 (dsh-primary-session)",
     "description": "每个工作区只有一个主会话，行首显示「主」徽标，设为主会话会取消同区其它置顶。"
   }
 }
