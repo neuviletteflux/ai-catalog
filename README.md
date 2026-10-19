@@ -61,6 +61,30 @@ This repository is designed to keep your AI resources centralized and portable a
     └── devcontainer.json
 ```
 
+## Skill metadata (display spec)
+
+Every `skills/<id>/skill.yaml` is validated against [`schema/skill.schema.json`](schema/skill.schema.json). Since `spec_version: "1.1"` a skill must declare its menu face, so a slash menu reads the same as built-in commands: icon + localized title + English alias + one-line description.
+
+| Field | Required | Purpose | Maps to SKILL.md |
+| --- | --- | --- | --- |
+| `id` | yes | kebab-case identifier; the `/id` invocation token | `name` |
+| `name` | yes | canonical full name (may be English) | — |
+| `display_name` | yes | menu title, Chinese first, ≤40 chars | `displayName` |
+| `description` | yes | one-line routing hint shown in the menu, Chinese first, ≤120 chars | `description` |
+| `icon` | no | icon id from the client's built-in set | `icon` |
+
+Display precedence is `display_name → name → id`. When `display_name` differs from `id`, clients render the id as an alias next to it — the same shape as built-in rows such as `压缩 compact`.
+
+```yaml
+id: grill-me
+name: Grill Me
+display_name: 装填访谈
+description: 把当前会话切入不留情面的访谈模式，并显示访谈状态。
+```
+
+- Keep `id` ASCII kebab-case: it is both the invocation token and the cross-tool identifier, so never localize it.
+- `icon` is optional; unknown ids fall back to a generic skill icon.
+
 ## Quick start
 
 ### Clone

@@ -1,19 +1,48 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/neuviletteflux/ai-catalog/schema/skill.schema.json",
   "title": "Skill metadata",
+  "description": "AI Catalog 技能元数据（skill.yaml）。展示层规范：id 是唯一标识符与斜杠调用名，name 是规范全名，display_name 是菜单主标题（中文优先），description 是菜单右侧的一行路由说明（中文优先），icon 是可选的图标 id。同步到技能目录时，id 映射为 SKILL.md 的 name、display_name 映射为 displayName、description 与 icon 同名透传；展示优先级为 display_name → name → id。",
   "type": "object",
-  "required": ["id", "name", "version", "spec_version", "status", "maintainers", "description"],
+  "required": ["id", "name", "display_name", "version", "spec_version", "status", "maintainers", "description"],
   "properties": {
-    "id": {"type": "string"},
-    "name": {"type": "string"},
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 64,
+      "description": "机器标识符，kebab-case。既是目录内的唯一键，也是斜杠菜单中的 /id 调用名；对应 SKILL.md frontmatter 的 name。"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "description": "规范全名，用于目录、导出与跨工具引用；可以是英文 Title Case。"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40,
+      "description": "菜单主标题，中文优先（如「装填访谈」）。同步为 SKILL.md frontmatter 的 displayName；客户端遇到缺少该字段的旧技能时回退 name。"
+    },
+    "icon": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 40,
+      "description": "可选图标 id，取自目标客户端的内置图标集；缺失或无法识别时回退通用技能图标。"
+    },
     "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
-    "spec_version": {"type": "string"},
+    "spec_version": {"type": "string", "description": "元数据规范版本；1.1 起 display_name 必填。"},
     "status": {"type": "string", "enum": ["draft", "experimental", "stable", "deprecated"]},
     "maintainers": {
       "type": "array",
       "items": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "email": {"type": "string"}}}
     },
-    "description": {"type": "string"},
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "一行路由说明，显示在斜杠菜单右侧，中文优先；同时作为 SKILL.md 的 description，模型据此决定是否加载技能。"
+    },
     "tags": {"type": "array", "items": {"type": "string"}},
     "license": {"type": "string"},
     "language": {"type": "string"},

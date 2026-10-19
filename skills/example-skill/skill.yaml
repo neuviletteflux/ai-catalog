@@ -1,13 +1,14 @@
 id: example-skill
 name: Example Skill
+display_name: 示例技能
 version: 0.1.0
-spec_version: "1.0"
+spec_version: "1.1"
 status: experimental
 maintainers:
   - name: neuviletteflux
     email: neuviletteflux@example.com
 description: |
-  A minimal example skill that demonstrates how a skill should be structured and run.
+  最小示例技能：演示技能的目录结构、元数据写法与本地运行方式。
 tags: [example, demo]
 license: MIT
 language: python
