@@ -19,8 +19,33 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
-    "plugin.yaml"
+    "CHANGELOG.md",
+    "LICENSE",
+    "plugin.yaml",
+    "assets"
   ],
+  "scripts": {
+    "test": "node --test tests/logic.test.mjs tests/apply.test.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "session",
+    "pin",
+    "primary",
+    "sidebar"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuviletteflux/ai-catalog.git",
+    "directory": "plugins/dsh-primary-session"
+  },
+  "homepage": "https://github.com/neuviletteflux/ai-catalog/tree/main/plugins/dsh-primary-session",
+  "bugs": "https://github.com/neuviletteflux/ai-catalog/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -35,12 +60,9 @@
       ]
     }
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
-  },
   "engines": {
     "node": "^22.19.0 || >=24.0.0",
-    "dsh": ">=0.2.1-rc.2"
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "license": "MIT"
 }

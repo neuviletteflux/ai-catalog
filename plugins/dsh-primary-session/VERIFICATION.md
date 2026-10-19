@@ -8,7 +8,10 @@
 - 会话行 `...` 菜单新增第一项：**设为主会话 / 取消主会话**（`order: 90`，位于内置
   「置顶会话」之前）。
 - 行首主会话徽标：`sidebar.session.row.leading` 注册 `primary-badge`，为“该工作区
-  Host 置顶列表中最新的一条”渲染强调色「主」徽标（15px 圆角块，行尾图钉保留）。
+  Host 置顶列表中最新的一条”渲染强调色徽标（行尾图钉保留）。
+- 徽标样式可选：`localStorage["dsh.primary.badge.style"]` 支持
+  `solid/soft/outline/circle/star/bar` 六种，默认 `bar`；已用真实实例逐样式渲染
+  截图（`assets/badge-styles.png`）。
 - **设为主会话**：先 `unpin` 同一工作区其它置顶会话（未分组会话只处理未分组置顶），
   再 `pin` 当前会话，使该工作区最多一个置顶。
 - **取消主会话**：只 `unpin` 当前会话，其它工作区不受影响。
@@ -45,10 +48,10 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-primary-session
 node --test tests/logic.test.mjs tests/apply.test.mjs
 ```
 
-结果：11 项通过，0 失败。覆盖：同区 sibling 先取消再置顶、无 sibling 只置顶、
+结果：12 项通过，0 失败。覆盖：同区 sibling 先取消再置顶、无 sibling 只置顶、
 未分组桶隔离、取消只动当前、sibling 取消失败仍尝试置顶并报错、`primaryPlan`
 工作区分桶、`isPrimaryOf` 按 Host 置顶顺序取每桶第一条、两个 slot 的注册参数、
-菜单标签随置顶状态切换、徽标只渲染主会话、归档行不渲染。
+菜单标签随置顶状态切换、徽标只渲染主会话、徽标样式切换、归档行不渲染。
 
 ### 元数据校验
 

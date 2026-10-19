@@ -3,7 +3,7 @@
 # All behavior lives in the browser bundle declared by `dsh.client`; this layer
 # only makes the package a loadable Profile Bundle:
 #
-#   dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-primary-session
+#   dsh plugin --profile web add 'github:neuviletteflux/ai-catalog#path:/plugins/dsh-primary-session'
 #
 - insert:
     - id: primary-session
