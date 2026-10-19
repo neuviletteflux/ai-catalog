@@ -1,0 +1,47 @@
+name: validate
+
+"on":
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Validate catalog metadata
+        run: python scripts/validate_metadata.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test dsh-draft-rows
+        working-directory: plugins/dsh-draft-rows
+        run: npm test
+
+      - name: Test dsh-primary-session
+        working-directory: plugins/dsh-primary-session
+        run: npm test
+
+      - name: Check dsh-draft-rows package contents
+        working-directory: plugins/dsh-draft-rows
+        run: npm pack --dry-run
+
+      - name: Check dsh-primary-session package contents
+        working-directory: plugins/dsh-primary-session
+        run: npm pack --dry-run

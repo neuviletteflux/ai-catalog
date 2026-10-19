@@ -176,3 +176,44 @@ test("options-bearing startSession stays stock", async () => {
   assert.equal(harness.stockStarts.length, 1);
   harness.cleanup();
 });
+
+test("the visible list collapses extra empty drafts to the current one", () => {
+  const harness = makeHarness({
+    workspaceSessionIds: ["a", "b", "c"],
+    current: "c",
+    sessionOverrides: {
+      a: { updatedAt: 1 },
+      b: { updatedAt: 2 },
+      c: { updatedAt: 0 }
+    }
+  });
+  const snapshot = harness.sessions.list.getSnapshot();
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot.ids)), ["c"]);
+  assert.equal(snapshot.byId.a, undefined);
+  assert.equal(snapshot.byId.b, undefined);
+  assert.equal(snapshot.byId.c.title, "新会话");
+  harness.cleanup();
+});
+
+test("typed drafts stay and the single New Session row leads them", async () => {
+  const harness = makeHarness({
+    drafts: { "dsh.conversation.a": JSON.stringify({ draft: { text: "hello" }, references: [] }) },
+    workspaceSessionIds: ["a", "b", "c"],
+    current: "c",
+    sessionOverrides: {
+      a: { updatedAt: 1 },
+      b: { updatedAt: 2 },
+      c: { updatedAt: 0 }
+    }
+  });
+  const snapshot = harness.sessions.list.getSnapshot();
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot.ids)), ["c", "a"]);
+  assert.equal(snapshot.byId.c.title, "新会话");
+  assert.equal(snapshot.byId.a.title, "草稿｜hello");
+  assert.equal(snapshot.byId.b, undefined);
+
+  harness.uiWorkspace.startSession();
+  await tick();
+  assert.equal(JSON.stringify(harness.creates), JSON.stringify([{ workspaceId: "w", sessionId: "c" }]), "New Session reuses the visible empty draft");
+  harness.cleanup();
+});

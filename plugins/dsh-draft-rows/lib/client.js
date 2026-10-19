@@ -11,18 +11,27 @@ var module = { exports: {} }; var exports = module.exports;
  *    current one. We shadow `sessions.list.getSnapshot` and project each
  *    blank draft as `blank: false` with a preview title, so the stock tree
  *    renders it as an ordinary row. No renderer or core file is modified.
- * 2. Preview: the current draft's composer is subscribed through
+ * 2. One New Session per workspace: extra EMPTY drafts collapse into a
+ *    single visible row (the current empty draft when there is one,
+ *    otherwise the newest one). Drafts that carry unsent text are kept as
+ *    their own rows. Hidden empties still exist on the Host and are reused
+ *    by New Session instead of minting another session.
+ * 3. Preview: the current draft's composer is subscribed through
  *    `conversation.input`; its text becomes the row title live and is
  *    mirrored to localStorage so previews survive reloads. On install the
  *    existing `dsh.conversation.*` keys are scanned, which also surfaces
  *    drafts orphaned by the stock 0.2.1 behavior.
- * 3. New Session: the stock "always mint a fresh id" rule is replaced.
- *    - multi (default): reuse the workspace's EMPTY draft; when every draft
- *      carries text, mint a fresh one. Typed drafts stay as their own rows.
+ * 4. New Session: the stock "always mint a fresh id" rule is replaced.
+ *    - multi (default): reuse the workspace's visible EMPTY draft; when
+ *      every draft carries text, mint a fresh one. Typed drafts stay as
+ *      their own rows.
  *    - single: reuse the workspace's single blank regardless of text (the
  *      pre-0.2.1 behavior).
  *    Switch with localStorage["dsh.drafts.mode"] = "single" and reload.
- * 4. Discard: the stock row menu's Archive discards a draft; the preview is
+ * 5. Order: draft rows are visually pinned above ordinary AND pinned
+ *    sessions, inside their Workspace, through CSS `order` on the stock
+ *    tree rows. `data-dsh-draft-primary` marks the single New Session row.
+ * 6. Discard: the stock row menu's Archive discards a draft; the preview is
  *    pruned when the archived-set changes.
  *
  * Fail-soft: any missing service leaves the stock behavior untouched.
@@ -129,11 +138,12 @@ function findReusableDraft(stock, workspaceSnapshot, previews, workspaceId, mode
   if (workspace === undefined) return undefined;
   var archived = new Set(workspaceSnapshot.archivedSessionIds || []);
   var members = new Set(workspace.sessionIds || []);
-  if (mode === "single" && preferredId !== undefined) {
+  if (preferredId !== undefined) {
     var preferred = stock.byId === undefined ? undefined : stock.byId[preferredId];
     if (preferred !== undefined && preferred !== null && isDraft(preferred)
       && members.has(preferredId) && !archived.has(preferredId)
-      && (workspace.path === undefined || preferred.cwd === workspace.path)) return preferred;
+      && (workspace.path === undefined || preferred.cwd === workspace.path)
+      && (mode === "single" || !previews.has(preferredId))) return preferred;
   }
   var best;
   var ids = stock.ids || [];
@@ -151,16 +161,107 @@ function findReusableDraft(stock, workspaceSnapshot, previews, workspaceId, mode
   return best;
 }
 
-/** Project every visible draft into an ordinary row with a preview title. */
-function projectDraftList(stock, previews, fallbackTitle, archived, prefix) {
+/** Newest first, Session id as the deterministic tie-break. */
+function compareDrafts(a, b) {
+  var left = typeof a.updatedAt === "number" ? a.updatedAt : 0;
+  var right = typeof b.updatedAt === "number" ? b.updatedAt : 0;
+  if (left !== right) return right - left;
+  return a.id < b.id ? -1 : 1;
+}
+
+/**
+ * Decide which draft rows stay visible.
+ *
+ * Exactly one empty draft per Workspace bucket (or the ungrouped bucket)
+ * remains: the current session when it is empty, otherwise the newest one.
+ * Every draft with unsent text keeps its own row. Archived drafts are left to
+ * the stock archived filter.
+ *
+ * @returns `hidden` (empty drafts to omit), `visible` (drafts that render),
+ *   `canonical` (the single empty draft per bucket), and `ordered` (rows with
+ *   the canonical New Session first, then typed drafts newest-first).
+ */
+function planDraftRows(stock, workspaceSnapshot, previews, archived, currentId) {
+  var hidden = new Set();
+  var visible = new Set();
+  var canonical = new Set();
+  var ordered = [];
+  var emptyByGroup = new Map();
+  var typedByGroup = new Map();
+  var groupBySession = new Map();
+  var items = (workspaceSnapshot && workspaceSnapshot.items) || [];
+  for (var i = 0; i < items.length; i += 1) {
+    var workspaceKey = items[i].workspaceId === undefined ? "" : items[i].workspaceId;
+    var memberIds = items[i].sessionIds || [];
+    for (var j = 0; j < memberIds.length; j += 1) {
+      if (!groupBySession.has(memberIds[j])) groupBySession.set(memberIds[j], workspaceKey);
+    }
+  }
+  var ids = (stock && stock.ids) || [];
+  for (var k = 0; k < ids.length; k += 1) {
+    var id = ids[k];
+    var summary = stock.byId === undefined ? undefined : stock.byId[id];
+    if (summary === undefined || !isDraft(summary)) continue;
+    if (archived !== undefined && archived !== null && archived.has(id)) continue;
+    var group = groupBySession.has(id) ? groupBySession.get(id) : "";
+    var typed = previews !== undefined && previews !== null && previews.has(id);
+    var bucket = typed ? typedByGroup : emptyByGroup;
+    var members = bucket.get(group);
+    if (members === undefined) {
+      members = [];
+      bucket.set(group, members);
+    }
+    members.push(summary);
+  }
+  var groups = new Set();
+  emptyByGroup.forEach(function (_members, group) { groups.add(group); });
+  typedByGroup.forEach(function (_members, group) { groups.add(group); });
+  groups.forEach(function (group) {
+    var empties = emptyByGroup.get(group) || [];
+    empties.sort(compareDrafts);
+    var chosen;
+    for (var i = 0; i < empties.length; i += 1) {
+      if (empties[i].id === currentId) { chosen = empties[i]; break; }
+    }
+    if (chosen === undefined) chosen = empties[0];
+    if (chosen !== undefined) {
+      canonical.add(chosen.id);
+      visible.add(chosen.id);
+      ordered.push(chosen.id);
+    }
+    for (var h = 0; h < empties.length; h += 1) {
+      if (chosen === undefined || empties[h].id !== chosen.id) hidden.add(empties[h].id);
+    }
+    var typedRows = typedByGroup.get(group) || [];
+    typedRows.sort(compareDrafts);
+    for (var t = 0; t < typedRows.length; t += 1) {
+      visible.add(typedRows[t].id);
+      ordered.push(typedRows[t].id);
+    }
+  });
+  return { hidden: hidden, visible: visible, canonical: canonical, ordered: ordered };
+}
+
+/**
+ * Project every visible draft into an ordinary row with a preview title.
+ * `hidden` omits the extra empty drafts collapsed by {@link planDraftRows}.
+ */
+function projectDraftList(stock, previews, fallbackTitle, archived, prefix, hidden) {
   if (stock === undefined || stock === null || typeof stock.byId !== "object" || stock.byId === null) {
     return stock;
   }
   var byId = Object.assign({}, stock.byId);
   var changed = false;
   var ids = stock.ids || [];
-  for (var i = 0; i < ids.length; i += 1) {
-    var id = ids[i];
+  var kept = hidden === undefined || hidden === null ? ids : ids.filter(function (id) { return !hidden.has(id); });
+  if (kept.length !== ids.length) {
+    changed = true;
+    for (var h = 0; h < ids.length; h += 1) {
+      if (hidden.has(ids[h])) delete byId[ids[h]];
+    }
+  }
+  for (var i = 0; i < kept.length; i += 1) {
+    var id = kept[i];
     var summary = stock.byId[id];
     if (summary === undefined || !isDraft(summary)) continue;
     if (archived !== undefined && archived !== null && archived.has(id)) continue;
@@ -174,7 +275,7 @@ function projectDraftList(stock, previews, fallbackTitle, archived, prefix) {
     changed = true;
   }
   if (!changed) return stock;
-  return Object.assign({}, stock, { byId: byId });
+  return Object.assign({}, stock, { ids: kept, byId: byId });
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +302,41 @@ function installStyles() {
     '  background-color: var(--dsw-alias-label-tertiary);',
     '  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.2 13.6l-3.2.8.8-3.2z\' fill=\'none\' stroke=\'%23000\' stroke-width=\'1.4\' stroke-linejoin=\'round\' stroke-linecap=\'round\'/%3E%3C/svg%3E") center/12px 12px no-repeat;',
     '  mask: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M11.3 2.7a1.7 1.7 0 0 1 2.4 2.4L5.2 13.6l-3.2.8.8-3.2z\' fill=\'none\' stroke=\'%23000\' stroke-width=\'1.4\' stroke-linejoin=\'round\' stroke-linecap=\'round\'/%3E%3C/svg%3E") center/12px 12px no-repeat;',
+    '}',
+    // Visual order only: the stock tree renders pinned rows first, so drafts
+    // are lifted above them inside each Workspace (the header stays first).
+    // Rows are wrapped in a HoverCard span, so the wrapper is the flex item.
+    '[role="tree"]:has(> span > [role="treeitem"][data-row-key^="session:"]),',
+    '[role="tree"]:has(> [role="treeitem"][data-row-key^="session:"]){',
+    '  display: flex;',
+    '  flex-direction: column;',
+    '}',
+    '[role="tree"] div:has(> span > [role="treeitem"][data-row-key^="workspace:"]),',
+    '[role="tree"] div:has(> [role="treeitem"][data-row-key^="workspace:"]){',
+    '  display: flex;',
+    '  flex-direction: column;',
+    '}',
+    // Keep row heights stable inside the scrolling flex list.
+    '[role="tree"] span:has(> [data-row-key]){',
+    '  flex: 0 0 auto;',
+    '}',
+    '[role="tree"] span:has(> [data-row-key^="workspace:"]){',
+    '  order: -3;',
+    '}',
+    '[role="tree"] [data-row-key^="workspace:"]{',
+    '  order: -3;',
+    '}',
+    '[role="tree"] span:has(> [data-row-key^="session:"][data-dsh-draft="true"]){',
+    '  order: -1;',
+    '}',
+    '[role="tree"] [data-row-key^="session:"][data-dsh-draft="true"]{',
+    '  order: -1;',
+    '}',
+    '[role="tree"] span:has(> [data-row-key^="session:"][data-dsh-draft="true"][data-dsh-draft-primary="true"]){',
+    '  order: -2;',
+    '}',
+    '[role="tree"] [data-row-key^="session:"][data-dsh-draft="true"][data-dsh-draft-primary="true"]{',
+    '  order: -2;',
     '}'
   ].join("\n");
   document.head.appendChild(tag);
@@ -286,7 +422,8 @@ function installBehavior(ctx) {
   var previews = new Map();
   var archived = new Set((workspaces.list.getSnapshot().archivedSessionIds) || []);
   var cache = undefined;
-  var version = 0;
+  var planCache;
+  var revision = 0;
   var shells = new Map();
   var persistTimer;
   var wakeTimer;
@@ -314,15 +451,41 @@ function installBehavior(ctx) {
     return (zh[key] !== undefined ? zh[key] : en[key]) || key;
   };
 
-  function previewTitle(preview) {
-    return preview === undefined ? t("newSession") : t("draftPrefix") + preview;
+  /** Drop every derivation that depends on drafts or archive state. */
+  function invalidate() {
+    revision += 1;
+    planCache = undefined;
+    cache = undefined;
+  }
+
+  /** Current draft visibility plan, cached per snapshot identity and revision. */
+  function currentPlan() {
+    var stock = stockGet();
+    var workspaceSnapshot = workspaces.list.getSnapshot();
+    if (planCache !== undefined && planCache.stock === stock
+      && planCache.workspaceSnapshot === workspaceSnapshot
+      && planCache.revision === revision) return planCache.value;
+    var value = planDraftRows(stock, workspaceSnapshot, previews, archived, mainSessionIdOf(stock));
+    planCache = {
+      stock: stock,
+      workspaceSnapshot: workspaceSnapshot,
+      revision: revision,
+      value: value
+    };
+    return value;
   }
 
   function project() {
     var stock = stockGet();
-    if (cache !== undefined && cache.stock === stock && cache.version === version) return cache.value;
-    var value = projectDraftList(stock, previews, t("newSession"), archived, t("draftPrefix"));
-    cache = { stock: stock, version: version, value: value };
+    var plan = currentPlan();
+    if (cache !== undefined && cache.stock === stock && cache.plan === plan) return cache.value;
+    var value = projectDraftList(stock, previews, t("newSession"), archived, t("draftPrefix"), plan.hidden);
+    if (value !== stock && plan.ordered.length > 0) {
+      var seen = new Set(plan.ordered);
+      var rest = (value.ids || []).filter(function (id) { return !seen.has(id); });
+      value = Object.assign({}, value, { ids: plan.ordered.concat(rest) });
+    }
+    cache = { stock: stock, plan: plan, value: value };
     return value;
   }
 
@@ -351,8 +514,6 @@ function installBehavior(ctx) {
     wakeTimer = setTimeout(function () {
       wakeTimer = undefined;
       if (disposed) return;
-      version += 1;
-      cache = undefined;
       try {
         if (typeof listStore.set === "function") {
           var raw = stockGet();
@@ -370,11 +531,12 @@ function installBehavior(ctx) {
     var preview = previewOf(text);
     if (preview === undefined && attachmentCount > 0) preview = t("attachment");
     if (preview === undefined) {
-      if (previews.delete(sessionId)) { persistSoon(); wake(); }
+      if (previews.delete(sessionId)) { invalidate(); persistSoon(); wake(); }
       return;
     }
     if (previews.get(sessionId) === preview) return;
     previews.set(sessionId, preview);
+    invalidate();
     persistSoon();
     wake();
   }
@@ -396,7 +558,7 @@ function installBehavior(ctx) {
         changed = true;
       }
     });
-    if (changed) { persistSoon(); wake(); }
+    if (changed) { invalidate(); persistSoon(); wake(); }
   }
 
   function syncShells() {
@@ -442,7 +604,7 @@ function installBehavior(ctx) {
       next.forEach(function (id) { if (!archived.has(id)) changed = true; });
     }
     archived = next;
-    if (changed) { version += 1; cache = undefined; prunePreviews(); wake(); }
+    if (changed) { invalidate(); prunePreviews(); wake(); }
     scanRowsSoon();
   }
 
@@ -512,21 +674,21 @@ function installBehavior(ctx) {
   function scanRows() {
     scanFrame = undefined;
     if (disposed || typeof document === "undefined" || typeof document.querySelectorAll !== "function") return;
-    var stock = stockGet();
-    var draftIds = new Set();
-    var ids = stock.ids || [];
-    for (var i = 0; i < ids.length; i += 1) {
-      var summary = stock.byId === undefined ? undefined : stock.byId[ids[i]];
-      if (summary !== undefined && isDraft(summary) && !archived.has(ids[i])) draftIds.add(ids[i]);
-    }
+    var plan = currentPlan();
     var rows = document.querySelectorAll('[role="treeitem"][data-row-key^="session:"]');
     for (var j = 0; j < rows.length; j += 1) {
       var row = rows[j];
       var key = row.getAttribute("data-row-key");
       if (key === null) continue;
       var sessionId = key.slice("session:".length);
-      if (draftIds.has(sessionId)) row.setAttribute("data-dsh-draft", "true");
-      else if (row.hasAttribute("data-dsh-draft")) row.removeAttribute("data-dsh-draft");
+      if (plan.visible.has(sessionId)) {
+        row.setAttribute("data-dsh-draft", "true");
+        if (plan.canonical.has(sessionId)) row.setAttribute("data-dsh-draft-primary", "true");
+        else if (row.hasAttribute("data-dsh-draft-primary")) row.removeAttribute("data-dsh-draft-primary");
+      } else {
+        if (row.hasAttribute("data-dsh-draft")) row.removeAttribute("data-dsh-draft");
+        if (row.hasAttribute("data-dsh-draft-primary")) row.removeAttribute("data-dsh-draft-primary");
+      }
     }
   }
 
@@ -606,8 +768,11 @@ function installBehavior(ctx) {
     if (observer !== undefined) observer.disconnect();
     if (typeof document !== "undefined") {
       document.removeEventListener("dblclick", blockDraftRename, true);
-      var rows = document.querySelectorAll('[role="treeitem"][data-dsh-draft]');
-      for (var i = 0; i < rows.length; i += 1) rows[i].removeAttribute("data-dsh-draft");
+      var rows = document.querySelectorAll('[role="treeitem"][data-dsh-draft], [role="treeitem"][data-dsh-draft-primary]');
+      for (var i = 0; i < rows.length; i += 1) {
+        rows[i].removeAttribute("data-dsh-draft");
+        rows[i].removeAttribute("data-dsh-draft-primary");
+      }
     }
   };
 }
@@ -636,6 +801,7 @@ exports.__test = {
   mainSessionIdOf: mainSessionIdOf,
   recentWorkspace: recentWorkspace,
   findReusableDraft: findReusableDraft,
+  planDraftRows: planDraftRows,
   projectDraftList: projectDraftList
 };
 

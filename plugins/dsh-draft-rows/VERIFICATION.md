@@ -40,9 +40,28 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-draft-rows
 node --test tests/logic.test.mjs tests/apply.test.mjs
 ```
 
-结果：9 个测试全部通过（预览截断、draft 判定、投影、复用规则、单槽优先、patch 行为）。
+结果：12 个测试全部通过（预览截断、draft 判定、折叠计划、投影、复用规则、单槽优先、patch 行为）。
 
-### 隔离 Web Host E2E
+### 0.2.0 单新会话与置顶排序
+
+`node --test tests/logic.test.mjs tests/apply.test.mjs` 结果：12 个测试全部通过。新增覆盖：
+
+- `planDraftRows`：每个 workspace（含 ungrouped 桶）只保留一个空草稿；typed 草稿全部保留；当前空草稿优先成为唯一「新会话」行。
+- `projectDraftList` 的 `hidden` 参数：被折叠的空草稿同时离开 `ids` 与 `byId`，不会渲染。
+- multi 模式下 New Session 优先复用当前可见的空草稿，即使另一个隐藏 blank 的 `updatedAt` 更新。
+
+隔离 Web Host E2E（同 `0.2.1-rc.2`，临时 `DSH_HOME`，`dsh plugin --profile web add link:...`）：
+
+1. 输入 `hello draft`：侧边栏行标题变为 `草稿｜hello draft`。
+2. 点 New Session：新增一个 `新会话` 行，typed 草稿保留；再次点击复用该空草稿，不新增行。
+3. 切回 typed 草稿并清空输入：两个空草稿折叠为一行 `新会话`；刷新后仍只有一行。
+4. 行菜单置顶 typed 草稿：截图确认 `新会话` 仍显示在置顶行之前（`order` 是纯视觉排序，stock 的 pinned 状态与行菜单不变）。
+5. workspace 标题始终位于其草稿行之前。
+
+实现细节：草稿行由 HoverCard 包在 `span` 中，因此排序规则同时命中 wrapper `span` 与未包裹的 `[data-row-key]`；flex 容器只在存在直接 session 行的 `[role="tree"]` 或 workspace 分组上启用，并给 wrapper 加 `flex: 0 0 auto` 防止滚动列表压缩行高。
+
+
+### 0.1.0 隔离 Web Host E2E
 
 用同一个 `0.2.1-rc.2` CLI 在临时 `DSH_HOME` 启动真实 web host，安装本插件，用 Chrome 驱动真实 UI：
 
@@ -79,6 +98,8 @@ node --test tests/logic.test.mjs tests/apply.test.mjs
 
 - 草稿附件仍不在 stock conversation 快照里；附件-only 草稿显示 `[附件]` 并视为占用，但附件本身切换后会丢。
 - 草稿行通过 `sessions.list.getSnapshot` 投影实现；未来 renderer/状态形状变化时需要重新验证。
+- 置顶排序是 CSS `order` 的纯视觉排序：DOM 顺序与键盘上下导航仍是 stock 顺序，草稿可能视觉上在置顶行之前、但焦点仍按源顺序移动。
+- 排序容器依赖 HoverCard 的 `span` 包裹与 `[role="treeitem"][data-row-key]` 结构；未来 renderer 改用别的包裹层时需要重新验证 `:has(> span > …)` 选择器。
 - 草稿行禁用了双击重命名（预览标题优先）；行菜单里的 Rename 仍可能存在，但显示仍以预览为准。
 - 桌面端升级后如果 `startSession`/`list` 形状变化，插件会降级为 stock；需要按版本重新验证。
 - App 更新可能重置 profile 配置；升级后检查插件是否仍在。

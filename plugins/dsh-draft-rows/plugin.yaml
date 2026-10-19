@@ -1,6 +1,6 @@
 id: dsh-draft-rows
 name: DSH Draft Rows
-version: "0.1.0"
+version: "0.2.0"
 spec_version: "1.0"
 status: experimental
 maintainers:
@@ -8,10 +8,12 @@ maintainers:
     email: neuviletteflux@gmail.com
 description: |
   DeepSeek Harness client plugin that turns unsent New Sessions into visible
-  sidebar draft rows. Drafts show a live preview of the composer text, survive
-  switching and reloads, and New Session reuses the empty draft instead of
-  minting a fresh session id every time. Multi-draft is the default; a single
-  reusable draft slot is available through a localStorage switch.
+  sidebar draft rows. Each workspace keeps exactly one New Session row: extra
+  empty drafts are collapsed and reused, while drafts that carry unsent text
+  stay as their own rows. Drafts show a live preview of the composer text,
+  survive switching and reloads, and are sorted above pinned sessions. The
+  pre-0.2.1 single-slot behavior remains available through a localStorage
+  switch.
 tags: [dsh, deepseek-harness, plugin, drafts, new-session, sidebar]
 license: MIT
 entrypoint: "lib/index.js"

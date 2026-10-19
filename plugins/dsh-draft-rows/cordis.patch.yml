@@ -3,7 +3,7 @@
 # All behavior lives in the browser bundle declared by `dsh.client`; this layer
 # only makes the package a loadable Profile Bundle:
 #
-#   dsh plugin --profile desktop add link:/path/to/dsh-draft-rows
+#   dsh plugin --profile web add 'github:neuviletteflux/ai-catalog#path:/plugins/dsh-draft-rows'
 #
 - insert:
     - id: draft-rows

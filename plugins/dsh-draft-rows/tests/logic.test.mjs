@@ -40,7 +40,7 @@ function loadBundle() {
 }
 
 const bundle = loadBundle();
-const { previewOf, isDraft, mainSessionIdOf, findReusableDraft, projectDraftList } = bundle.__test;
+const { previewOf, isDraft, mainSessionIdOf, findReusableDraft, planDraftRows, projectDraftList } = bundle.__test;
 
 function summary(id, overrides = {}) {
   return {
@@ -112,8 +112,48 @@ test("projectDraftList turns drafts into titled ordinary rows and leaves stock i
   assert.equal(archived.byId.a, a, "archived drafts stay stock");
   assert.equal(archived.byId.b.title, "草稿｜world");
 
+  const hidden = projectDraftList(stock, previews, "新会话", new Set(), "草稿｜", new Set(["a"]));
+  assert.equal(hidden.byId.a, undefined, "hidden drafts leave byId");
+  assert.deepEqual(Array.from(hidden.ids), ["b", "c", "d"], "hidden drafts leave ids");
+  assert.equal(hidden.byId.b.title, "草稿｜world");
+
   const noDrafts = list(["c"], { c });
   assert.equal(projectDraftList(noDrafts, previews, "新会话", new Set(), "草稿｜"), noDrafts, "no drafts returns the stock snapshot untouched");
+});
+
+test("planDraftRows keeps one empty draft per workspace and every typed draft", () => {
+  const ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i"];
+  const byId = {
+    a: summary("a", { updatedAt: 1 }), // typed, w1
+    b: summary("b", { updatedAt: 2 }), // empty, current, w1
+    c: summary("c", { updatedAt: 3 }), // empty, w1 -> hidden
+    d: summary("d", { blank: false, updatedAt: 4 }), // sent, w1
+    e: summary("e", { updatedAt: 5 }), // archived empty, w1
+    f: summary("f", { updatedAt: 1 }), // empty, w2 -> hidden
+    g: summary("g", { updatedAt: 6 }), // empty, w2 -> canonical
+    h: summary("h", { updatedAt: 1 }), // empty, ungrouped -> hidden
+    i: summary("i", { updatedAt: 7 }) // empty, ungrouped -> canonical
+  };
+  const stock = list(ids, byId, { current: "b" });
+  const workspaces = {
+    items: [
+      { workspaceId: "w1", sessionIds: ["a", "b", "c", "d", "e"] },
+      { workspaceId: "w2", sessionIds: ["f", "g"] }
+    ]
+  };
+  const previews = new Map([["a", "typed a"]]);
+  const archived = new Set(["e"]);
+
+  const plan = planDraftRows(stock, workspaces, previews, archived, "b");
+  assert.deepEqual(Array.from(plan.hidden).sort(), ["c", "f", "h"], "extra empty drafts collapse");
+  assert.deepEqual(Array.from(plan.canonical).sort(), ["b", "g", "i"], "one empty draft per bucket");
+  assert.deepEqual(Array.from(plan.visible).sort(), ["a", "b", "g", "i"], "typed drafts and one empty per bucket stay");
+  assert.ok(plan.ordered.indexOf("b") < plan.ordered.indexOf("a"), "the New Session row leads typed drafts in its workspace");
+  assert.ok(!plan.ordered.includes("c"), "hidden drafts never enter the row order");
+
+  const noCurrent = planDraftRows(stock, workspaces, previews, archived, "d");
+  assert.ok(noCurrent.canonical.has("c"), "without an empty current draft the newest empty is canonical");
+  assert.ok(!noCurrent.canonical.has("b"), "the older empty draft stays collapsed");
 });
 
 test("findReusableDraft: multi skips occupied drafts, single reuses the blank", () => {
@@ -138,6 +178,16 @@ test("findReusableDraft: multi skips occupied drafts, single reuses the blank", 
 
   const singlePreferred = findReusableDraft(stock, workspace, previews, "w", "single", "a");
   assert.equal(singlePreferred.id, "a", "single prefers the current draft over a newer empty one");
+
+  const multiPreferred = findReusableDraft(
+    list(["a", "b"], { a: summary("a", { updatedAt: 1 }), b: summary("b", { updatedAt: 5 }) }),
+    workspace,
+    new Map(),
+    "w",
+    "multi",
+    "a"
+  );
+  assert.equal(multiPreferred.id, "a", "multi reuses the visible empty draft even when another blank is newer");
 
   const otherCwd = { ...workspace, items: [{ ...workspace.items[0], path: "/other" }] };
   assert.equal(findReusableDraft(stock, otherCwd, previews, "w", "multi"), undefined);

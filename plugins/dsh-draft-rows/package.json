@@ -1,7 +1,7 @@
 {
   "name": "dsh-draft-rows",
-  "version": "0.1.0",
-  "description": "Draft sessions for DeepSeek Harness: unsent New Sessions stay visible in the sidebar with live draft previews; New Session reuses the empty draft and only mints when every draft is occupied.",
+  "version": "0.2.0",
+  "description": "Draft sessions for DeepSeek Harness: one New Session row per workspace, typed drafts kept as their own rows, and draft rows sorted above pinned sessions.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -19,8 +19,32 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
-    "plugin.yaml"
+    "CHANGELOG.md",
+    "LICENSE",
+    "plugin.yaml",
+    "assets"
   ],
+  "scripts": {
+    "test": "node --test tests/logic.test.mjs tests/apply.test.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "drafts",
+    "new-session",
+    "sidebar"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuviletteflux/ai-catalog.git",
+    "directory": "plugins/dsh-draft-rows"
+  },
+  "homepage": "https://github.com/neuviletteflux/ai-catalog/tree/main/plugins/dsh-draft-rows",
+  "bugs": "https://github.com/neuviletteflux/ai-catalog/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -36,11 +60,9 @@
       ]
     }
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1"
-  },
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "license": "MIT"
 }
