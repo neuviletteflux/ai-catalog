@@ -1,11 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Plugin metadata",
+  "description": "AI Catalog 插件元数据（plugin.yaml）。这是目录侧元数据；DSH 已安装插件页的标题、描述与图标来自包内 locale/*.json 和 package.json，不读取本文件的 name/description。",
   "type": "object",
   "required": ["id", "name", "version", "spec_version", "status", "maintainers", "description"],
   "properties": {
-    "id": {"type": "string"},
-    "name": {"type": "string"},
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "工程名，必须与 package.json.name 一致；不随语言本地化。"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "目录规范全名（英文 Title Case），建议与 locale/en.json 的显示名一致。"
+    },
     "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
     "spec_version": {"type": "string"},
     "status": {"type": "string", "enum": ["draft", "experimental", "stable", "deprecated"]},
@@ -13,7 +22,11 @@
       "type": "array",
       "items": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "email": {"type": "string"}}}
     },
-    "description": {"type": "string"},
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "目录侧长描述；不用于 DSH UI 的插件卡片。"
+    },
     "tags": {"type": "array", "items": {"type": "string"}},
     "license": {"type": "string"},
     "entrypoint": {"type": "string"},

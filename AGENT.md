@@ -18,7 +18,7 @@
 
 Agent 能力一览
 ---
-- validate-metadata: 扫描仓库中的 skill.yaml/plugin.yaml/prompt.* 文件并用 JSON Schema 校验
+- validate-metadata: 扫描仓库中的 skill.yaml/plugin.yaml/prompt.* 文件并用 JSON Schema 校验；同时检查插件包的 locale 显示元数据、图标与打包白名单
 - scan-secrets: 基于正则的简单 token/secret 检测（CI 阶段阻断）
 - run-tests: 运行 pytest 并上报结果
 - install-environment: 在目标机器上创建虚拟环境并安装依赖（requirements.txt）

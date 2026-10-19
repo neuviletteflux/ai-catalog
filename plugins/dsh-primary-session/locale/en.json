@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Primary Session (dsh-primary-session)",
+    "description": "One primary session per workspace, marked with a leading 主 badge; setting it unpins the workspace's other sessions."
+  }
+}

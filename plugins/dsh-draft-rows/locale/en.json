@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Draft Rows (dsh-draft-rows)",
+    "description": "Unsent New Sessions stay in the sidebar as draft rows: one empty draft per workspace, typed drafts as their own rows."
+  }
+}

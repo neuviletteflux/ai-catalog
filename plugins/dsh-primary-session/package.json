@@ -2,6 +2,7 @@
   "name": "dsh-primary-session",
   "version": "0.1.0",
   "description": "DSH sidebar plugin: one pinned primary session per workspace, marked with a leading 主 badge.",
+  "icon": "assets/icon.svg",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -12,6 +13,7 @@
       "default": "./lib/client.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -22,6 +24,7 @@
     "CHANGELOG.md",
     "LICENSE",
     "plugin.yaml",
+    "locale",
     "assets"
   ],
   "scripts": {

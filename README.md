@@ -85,6 +85,32 @@ description: 把当前会话切入不留情面的访谈模式，并显示访谈�
 - Keep `id` ASCII kebab-case: it is both the invocation token and the cross-tool identifier, so never localize it.
 - `icon` is optional; unknown ids fall back to a generic skill icon.
 
+## Plugin metadata (display spec)
+
+The DSH plugin manager resolves an installed bundle's title, description, and icon from the package itself. `plugin.yaml` is catalog metadata and is not rendered by DSH. A compliant plugin package therefore ships:
+
+| Artifact | Purpose |
+| --- | --- |
+| `package.json.name` | technical id; never localized |
+| `locale/en.json` | required anchor dictionary with `meta.title` / `meta.description` |
+| `locale/zh.json` | Chinese dictionary, same shape |
+| `exports["./locale/*.json"]` | lets DSH resolve both dictionaries through Node exports |
+| `files` entry `locale` | keeps the dictionaries in the packed or git-installed package |
+| `package.json.icon` (or exported `./icon`) | optional; SVG, PNG, JPEG, or WebP up to 256 KiB |
+
+`meta.title` follows `Display Name (package-name)` so the technical id stays visible, e.g. `草稿行 (dsh-draft-rows)` and `Draft Rows (dsh-draft-rows)`. `meta.description` is one short sentence; cards clamp it to a single line. DSH falls back from locale `meta` to `package.json.name` / `description`, and finally to the module specifier, so a missing or empty `en.json` exposes the raw id in both languages.
+
+```json
+{
+  "meta": {
+    "title": "草稿行 (dsh-draft-rows)",
+    "description": "未发送的新会话留在侧边栏成为草稿行：每个工作区一个空草稿，写了字各自成行。"
+  }
+}
+```
+
+`python scripts/validate_metadata.py` checks the plugin schema plus these package rules. Keep `plugin.yaml.name` aligned with the English display name.
+
 ## Quick start
 
 ### Clone
