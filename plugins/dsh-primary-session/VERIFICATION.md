@@ -1,0 +1,83 @@
+# dsh-primary-session 实施与验证记录
+
+日期：2026-10-19
+目标版本：DSH Desktop `0.2.1-rc.2`
+
+## 已实现
+
+- 会话行 `...` 菜单新增第一项：**设为主会话 / 取消主会话**（`order: 90`，位于内置
+  「置顶会话」之前）。
+- **设为主会话**：先 `unpin` 同一工作区其它置顶会话（未分组会话只处理未分组置顶），
+  再 `pin` 当前会话，使该工作区最多一个置顶。
+- **取消主会话**：只 `unpin` 当前会话，其它工作区不受影响。
+- 已归档会话不渲染该项（与内置置顶一致）。
+- 复用 Host 现有置顶集合，无 schema、API、会话事件或新存储。
+- 失败只写 console warning；成功状态由 Host 的 pinned 集合回流。
+- 打包为 Profile Bundle：`package.json` 声明 `dsh.bundle.patch` + `dsh.client`，
+  包内 `cordis.patch.yml` 用包名插入 Loader 行，可由应用内「设置 → 插件 → 添加插件」
+  安装。
+
+## 代码位置
+
+```text
+/Users/lives/Github/ai-catalog/plugins/dsh-primary-session/
+├── plugin.yaml           # ai-catalog 元数据（schema/plugin.schema.json）
+├── package.json          # dsh.bundle.patch + dsh.client
+├── cordis.patch.yml      # insert: primary-session
+├── lib/index.js          # Host no-op
+├── lib/client.js         # 浏览器端全部逻辑
+├── tests/logic.test.mjs  # 唯一置顶/取消/失败聚合/分桶逻辑
+├── tests/apply.test.mjs  # slot 注册契约 + 菜单行渲染
+├── assets/               # README 菜单截图
+├── README.md             # English
+├── README.zh.md          # 简体中文
+└── VERIFICATION.md
+```
+
+## 自动化验证
+
+### 单元测试
+
+```bash
+cd /Users/lives/Github/ai-catalog/plugins/dsh-primary-session
+node --test tests/logic.test.mjs tests/apply.test.mjs
+```
+
+结果：9 项通过，0 失败。覆盖：同区 sibling 先取消再置顶、无 sibling 只置顶、
+未分组桶隔离、取消只动当前、sibling 取消失败仍尝试置顶并报错、`primaryPlan`
+工作区分桶、slot 注册参数、菜单标签随置顶状态切换、归档行不渲染。
+
+### 元数据校验
+
+```bash
+cd /Users/lives/Github/ai-catalog
+python3 scripts/validate_metadata.py
+```
+
+`plugin.yaml` 按 `schema/plugin.schema.json` 校验通过。
+
+## 集成验证
+
+- 用同版本 `dsh web --port 19555 --no-open`（home 层 patch 指向本目录）启动临时实例：
+  `window.__DSH_BOOT__` 的 entries 包含 `dsh-primary-session`，客户端 bundle 由
+  `/plugins` 正常提供。
+- 浏览器（Chrome headless）打开会话行菜单，实际渲染出「设为主会话」，位置在
+  「置顶会话」之前，console 无插件报错（见 `assets/dsh-primary-session.png`）。
+- 验证过程为只读：只打开菜单与截图，没有点击会改写置顶集合的菜单项；置顶/取消的
+  数据变更由单元测试用 fake `workspaces` 服务覆盖。
+
+## 安装状态与互斥
+
+- 当前通过 home 层 patch 挂载：
+  `$DSH_HOME/cordis.patch.yml` → `id: dsh-primary-session`，路径指向本目录
+  `lib/index.js`。
+- 本包同时具备 Bundle 安装条件；改用「设置 → 插件 → 添加插件」后，必须删除同一
+  home patch 条目，否则同一包会从两个 Loader 来源解析，客户端模块组合报错。
+
+## 已知边界
+
+- 唯一性按工作区（未分组算一桶），不是全局唯一。
+- 手动置顶可再次打破唯一，需再点一次「设为主会话」收敛。
+- 直接调用 `workspaces.pinSession` / `unpinSession`，不会像内置置顶按钮那样改写
+  本地保存的手动拖拽顺序。
+- 失败只写 console，没有 toast。

@@ -1,0 +1,17 @@
+id: dsh-primary-session
+name: DSH Primary Session
+version: "0.1.0"
+spec_version: "1.0"
+status: experimental
+maintainers:
+  - name: Neuvilette
+    email: neuviletteflux@gmail.com
+description: |
+  DeepSeek Harness client plugin that marks one pinned "primary" session per
+  workspace. Setting a primary unpins every other pinned session in the same
+  workspace and then pins the chosen row, so each workspace keeps exactly one
+  pin icon at the top of its group. Clearing removes only that pin.
+tags: [dsh, deepseek-harness, plugin, session, pin, sidebar, primary]
+license: MIT
+entrypoint: "lib/index.js"
+dependencies: []

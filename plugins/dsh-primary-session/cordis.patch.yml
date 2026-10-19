@@ -1,0 +1,10 @@
+# Mount dsh-primary-session into a DSH profile.
+#
+# All behavior lives in the browser bundle declared by `dsh.client`; this layer
+# only makes the package a loadable Profile Bundle:
+#
+#   dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-primary-session
+#
+- insert:
+    - id: primary-session
+      name: 'dsh-primary-session'
