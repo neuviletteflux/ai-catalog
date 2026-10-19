@@ -167,7 +167,7 @@ test("menu row labels and actions follow the pin state", async () => {
 });
 
 test("badge marks only the most recently pinned session of a workspace", () => {
-  const mod = loadBundle();
+  const mod = loadBundle("solid");
   const state = {
     items: [{ workspaceId: "w1", sessionIds: ["a", "b", "c"] }],
     pinnedSessionIds: ["b", "a"],
@@ -208,7 +208,11 @@ test("badge style selection switches the rendered variant", () => {
     });
   };
 
-  const solid = renderBadge();
+  const fallback = renderBadge();
+  assert.equal(fallback.type, "span");
+  assert.equal(fallback.props.children[0], null);
+
+  const solid = renderBadge("solid");
   assert.equal(solid.type, "span");
   assert.equal(solid.props.children[0], "badge.label");
 
@@ -221,5 +225,6 @@ test("badge style selection switches the rendered variant", () => {
   assert.equal(bar.props.children[0], null);
 
   const unknown = renderBadge("nope");
-  assert.equal(unknown.props.children[0], "badge.label");
+  assert.equal(unknown.type, "span");
+  assert.equal(unknown.props.children[0], null);
 });

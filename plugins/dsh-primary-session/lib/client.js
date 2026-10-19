@@ -155,7 +155,7 @@ window.__ModuleLoader__.load({
 			const first = pinnedIds.find((id) => !accounted.has(id));
 			return first === sessionId;
 		}
-		/** localStorage key selecting the badge visual; unknown values fall back to `solid`. */
+		/** localStorage key selecting the badge visual; unknown values fall back to `bar`. */
 		const BADGE_STYLE_KEY = "dsh.primary.badge.style";
 		/** Supported badge styles, also used by the README preview sheet. */
 		const BADGE_STYLES = ["solid", "soft", "outline", "circle", "star", "bar"];
@@ -167,9 +167,9 @@ window.__ModuleLoader__.load({
 		function badgeStyle() {
 			try {
 				const value = globalThis.localStorage?.getItem(BADGE_STYLE_KEY);
-				return BADGE_STYLES.includes(value) ? value : "solid";
+				return BADGE_STYLES.includes(value) ? value : "bar";
 			} catch {
-				return "solid";
+				return "bar";
 			}
 		}
 		/** Accent color shared by every badge style (the sidebar's business accent). */
