@@ -7,6 +7,8 @@
 
 - 会话行 `...` 菜单新增第一项：**设为主会话 / 取消主会话**（`order: 90`，位于内置
   「置顶会话」之前）。
+- 行首主会话徽标：`sidebar.session.row.leading` 注册 `primary-badge`，为“该工作区
+  Host 置顶列表中最新的一条”渲染强调色「主」徽标（15px 圆角块，行尾图钉保留）。
 - **设为主会话**：先 `unpin` 同一工作区其它置顶会话（未分组会话只处理未分组置顶），
   再 `pin` 当前会话，使该工作区最多一个置顶。
 - **取消主会话**：只 `unpin` 当前会话，其它工作区不受影响。
@@ -43,9 +45,10 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-primary-session
 node --test tests/logic.test.mjs tests/apply.test.mjs
 ```
 
-结果：9 项通过，0 失败。覆盖：同区 sibling 先取消再置顶、无 sibling 只置顶、
+结果：11 项通过，0 失败。覆盖：同区 sibling 先取消再置顶、无 sibling 只置顶、
 未分组桶隔离、取消只动当前、sibling 取消失败仍尝试置顶并报错、`primaryPlan`
-工作区分桶、slot 注册参数、菜单标签随置顶状态切换、归档行不渲染。
+工作区分桶、`isPrimaryOf` 按 Host 置顶顺序取每桶第一条、两个 slot 的注册参数、
+菜单标签随置顶状态切换、徽标只渲染主会话、归档行不渲染。
 
 ### 元数据校验
 
@@ -69,7 +72,8 @@ python3 scripts/validate_metadata.py
   `dsh web --port 19556 --no-open`，`window.__DSH_BOOT__` 的 entries 包含
   `dsh-primary-session`，客户端 bundle 由 `/plugins` 正常提供。
 - 浏览器（Chrome headless）打开会话行菜单，实际渲染出「设为主会话」，位置在
-  「置顶会话」之前，console 无插件报错（见 `assets/dsh-primary-session.png`）。
+  「置顶会话」之前；置顶行首渲染「主」徽标（见 `assets/primary-badge.png`），
+  console 无插件报错。
 - 验证过程为只读：只打开菜单与截图，没有点击会改写置顶集合的菜单项；置顶/取消的
   数据变更由单元测试用 fake `workspaces` 服务覆盖。
 - 验证后已清理 `web` profile 的测试安装。
@@ -90,3 +94,4 @@ python3 scripts/validate_metadata.py
 - 直接调用 `workspaces.pinSession` / `unpinSession`，不会像内置置顶按钮那样改写
   本地保存的手动拖拽顺序。
 - 失败只写 console，没有 toast。
+- 「主」徽标只在会话 idle 时渲染（行首 seat 被状态点占用时不显示）。

@@ -4,6 +4,8 @@
 
 Mark one pinned **primary session** per workspace in the DSH sidebar.
 
+![The primary badge and the row menu](assets/primary-badge.png)
+
 ![Set as primary in the session row menu](assets/dsh-primary-session.png)
 
 ## What it does
@@ -20,9 +22,12 @@ This plugin adds one row-menu item on top of Pin:
 | **Set as primary** | Unpins every other pinned session **in the same workspace** (or in the ungrouped bucket), then pins the selected session |
 | **Clear primary** | Unpins only the selected session; other workspaces are untouched |
 
-The marker itself is the stock pin icon, and the row is fronted ahead of normal
-rows — no new badge, storage, schema, or session event. Archived rows do not
-offer the item (pin and archive are mutually exclusive on the Host).
+The list keeps **one primary per workspace**: the first id of the Host-ordered
+pin list that belongs to that workspace. That row gets a compact accent **主**
+badge in the row-leading seat (the stock pin icon stays at the row end), and the
+row is fronted ahead of normal rows. No new storage, schema, or session event.
+Archived rows do not offer the menu item (pin and archive are mutually exclusive
+on the Host).
 
 ## Install
 
@@ -71,8 +76,12 @@ choice survives reloads and is shared across browsers talking to the same Host.
 
 - Uniqueness is **per workspace** (the ungrouped bucket counts as one), not
   global.
-- Manually pinning a second session breaks uniqueness; choosing **Set as
-  primary** again converges it.
+- Manually pinning a second session breaks uniqueness; the most recent pin
+  becomes primary (the badge moves), and choosing **Set as primary** again
+  converges the workspace back to one.
+- The badge sits in the row-leading seat, which is rendered only while the row
+  is idle; a running row shows its status dot there instead. The trailing pin
+  icon still marks it.
 - Calling the `workspaces` service directly updates the Host pin set and the
   pinned section, but does not rewrite the locally saved manual drag order the
   way the stock Pin button does.

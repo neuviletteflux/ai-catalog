@@ -134,3 +134,23 @@ test("primaryPlan keeps workspace buckets apart", () => {
     { pinned: true, siblings: [] }
   );
 });
+
+test("isPrimaryOf picks the first Host-ordered pin per bucket", () => {
+  const mod = loadBundle();
+  const snapshot = {
+    items: [
+      { workspaceId: "w1", sessionIds: ["a", "b"] },
+      { workspaceId: "w2", sessionIds: ["c"] }
+    ],
+    pinnedSessionIds: ["c", "b", "d"],
+    archivedSessionIds: []
+  };
+  assert.equal(mod.__test.isPrimaryOf(snapshot, "c"), true);
+  assert.equal(mod.__test.isPrimaryOf(snapshot, "b"), true);
+  assert.equal(mod.__test.isPrimaryOf(snapshot, "a"), false);
+  assert.equal(mod.__test.isPrimaryOf(snapshot, "d"), true);
+
+  const secondPin = { ...snapshot, pinnedSessionIds: ["a", "b"] };
+  assert.equal(mod.__test.isPrimaryOf(secondPin, "a"), true);
+  assert.equal(mod.__test.isPrimaryOf(secondPin, "b"), false);
+});

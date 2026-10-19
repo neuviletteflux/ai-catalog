@@ -1,11 +1,13 @@
 /**
  * dsh-primary-session — browser half.
  *
- * Adds one `sidebar.workspaces.session.menu.item` entry: “设为主会话 / 取消主会话”.
- * “设为主会话” keeps the existing pin mechanism, but first unpins every other
- * pinned Session in the *same* workspace (or in the ungrouped bucket), so the
- * workspace has exactly one pinned row — the primary Session, rendered with the
- * built-in pin marker and fronted above normal rows.
+ * Adds two slot entries:
+ * - `sidebar.workspaces.session.menu.item`: “设为主会话 / 取消主会话”. Promoting
+ *   first unpins every other pinned Session in the *same* workspace (or in the
+ *   ungrouped bucket), then pins the target — at most one pin per workspace.
+ * - `sidebar.session.row.leading`: a compact “主” badge on the workspace's latest
+ *   pin (the first id of `pinnedSessionIds` that belongs to that workspace), so
+ *   the primary row is distinguishable from an ordinary pin at a glance.
  *
  * No host API, schema, or session event is added: the pin set is already durable
  * on the Host and streamed through `workspaces.list`.
@@ -22,11 +24,15 @@ window.__ModuleLoader__.load({
 		const NS = "primary-session";
 		const zh = {
 			"menu.setPrimary": "设为主会话",
-			"menu.clearPrimary": "取消主会话"
+			"menu.clearPrimary": "取消主会话",
+			"badge.label": "主",
+			"badge.aria": "主会话"
 		};
 		const en = {
 			"menu.setPrimary": "Set as primary",
-			"menu.clearPrimary": "Clear primary"
+			"menu.clearPrimary": "Clear primary",
+			"badge.label": "P",
+			"badge.aria": "Primary session"
 		};
 		/**
 		 * The Workspace (or the ungrouped bucket) that owns a Session.
@@ -127,6 +133,59 @@ window.__ModuleLoader__.load({
 				}
 			}, label);
 		}
+		/**
+		 * Whether a Session is the primary of its bucket: the most recently pinned
+		 * Session of that workspace (the first matching id in the Host-ordered pin
+		 * list). A manual second pin therefore becomes primary until the original
+		 * is pinned again; “设为主会话” converges the bucket back to one.
+		 * @param snapshot - `workspaces.list` snapshot.
+		 * @param sessionId - target Session id.
+		 * @returns true when the row should carry the primary badge.
+		 */
+		function isPrimaryOf(snapshot, sessionId) {
+			const pinnedIds = Array.isArray(snapshot.pinnedSessionIds) ? snapshot.pinnedSessionIds : [];
+			if (!pinnedIds.includes(sessionId)) return false;
+			const items = Array.isArray(snapshot.items) ? snapshot.items : [];
+			const owner = workspaceOf(snapshot, sessionId);
+			if (owner !== undefined) {
+				const first = pinnedIds.find((id) => owner.sessionIds.includes(id));
+				return first === sessionId;
+			}
+			const accounted = new Set(items.flatMap((workspace) => Array.isArray(workspace.sessionIds) ? workspace.sessionIds : []));
+			const first = pinnedIds.find((id) => !accounted.has(id));
+			return first === sessionId;
+		}
+		/**
+		 * Row-leading badge: a compact accent chip that marks the primary row.
+		 * The seat is only rendered while the row is idle (a running row shows its
+		 * status dot there instead); the trailing pin icon still marks it.
+		 * @param props - composed slot props (`t`, `usePrimaryState`).
+		 * @returns the badge, or null for any non-primary row.
+		 */
+		function PrimaryBadge(props) {
+			const { sessionId, t, usePrimaryState } = props;
+			const snapshot = usePrimaryState((state) => state);
+			if (!isPrimaryOf(snapshot, sessionId)) return null;
+			return React.createElement("span", {
+				role: "img",
+				"aria-label": t("badge.aria"),
+				title: t("badge.aria"),
+				style: {
+					display: "inline-flex",
+					alignItems: "center",
+					justifyContent: "center",
+					width: "15px",
+					height: "15px",
+					borderRadius: "4px",
+					background: "var(--dsw-alias-state-business-primary)",
+					color: "#fff",
+					fontSize: "10px",
+					fontWeight: 600,
+					lineHeight: "15px",
+					flex: "none"
+				}
+			}, t("badge.label"));
+		}
 		/** Required client services. */
 		const inject = ["slots", "workspaces", "locale"];
 		/**
@@ -156,9 +215,17 @@ window.__ModuleLoader__.load({
 					}
 				})
 			}, PrimarySessionMenuItem));
+			ctx.slots.inject("sidebar.session.row.leading", () => ctx.slots.register({
+				name: "sidebar.session.row.leading",
+				id: "primary-badge",
+				order: 50,
+				locale: NS,
+				inject: () => ({ hooks: { primaryState: source } })
+			}, PrimaryBadge));
 		}
 		exports.__test = {
 			primaryPlan,
+			isPrimaryOf,
 			setPrimary,
 			clearPrimary
 		};
