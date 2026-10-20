@@ -34,11 +34,12 @@ plugins/dsh-session-naming/
 ├── lib/compose.js        # 标题拼装、词表、字节预算（纯函数）
 ├── lib/normalizer.js     # 自动规范化、类型推断、稳定窗口监听
 ├── lib/audit.js          # 只读标题审计（投影缓存）
+├── lib/backfill.js       # 默认 dry-run 的历史标题回填
 ├── lib/branch.js         # fork 判定、继承标题识别（只读）
 ├── lib/client.js         # 浏览器半侧：Session 行分叉图标
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 73 项 node:test
+├── tests/                # 76 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -54,7 +55,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**73 项通过，0 失败**。覆盖：
+结果：**76 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
@@ -66,6 +67,7 @@ npm test
   分支判定（`isSeeded` / `inheritedEventCount` / `origin: subagent` / 投影缓存）、普通/分支/`raw`/`AUTO`
   标题、截断报告、预算报错、网关调用参数、缺失网关与空参数错误；
 - `audit.js`：投影缓存扫描、limit、合规/分支/无效前缀/AUTO 缺序号/重复统计；
+- `backfill.js`：proposeBackfill 的保留目标/补日期/类型/Branch 规则、dry-run、apply 写入、跳过条件；
 - `client.js`：`isFork` 谓词、行前 seat 注册、locale 字典与组件的显示/隐藏；
 - `index.js`：配置默认值、未知键、类型错误、单半边启用、挂载与 dispose。
 

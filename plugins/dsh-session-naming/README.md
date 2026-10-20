@@ -7,7 +7,7 @@ a prompt-only instruction. The plugin has two halves:
 
 | Half | What it does |
 |---|---|
-| Agent tools | Adds `set_session_title` (current session), `rename_session` (any session by id), and a read-only `session_title_audit`. |
+| Agent tools | Adds `set_session_title` (current session), `rename_session` (any session by id), read-only `session_title_audit`, and dry-run-first `session_title_backfill`. |
 | Client UI | Optional leading-seat fork icon on Session rows (requires a restart to load the client bundle). |
 | Automatic normalizer | Watches `session/title`, waits for the built-in summary to settle, then appends `[Branch｜]MMDD｜类型｜目标`. |
 
@@ -15,7 +15,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.4.3` |
+| Version | `0.5.0` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -156,6 +156,14 @@ carrying `(n)`, invalid type prefixes, `AUTO` titles without a run index, and
 same-day/same-goal duplicates (parent/fork pairs are reported separately from
 true duplicates). It never writes a title, session log, or projection cache.
 
+`session_title_backfill` is the write path for historical rows: by default it
+is a dry run that returns proposals for every non-compliant top-level session,
+keeping the current title as the goal and normalizing only the date, type,
+`Branch｜`, and `(n)`. `apply: true` writes each proposal through the Host
+`sessionController.rename`; subagents, compliant titles, `AUTO` without a run
+index, and rows without a `createdAt` are skipped. Review the proposals before
+setting `apply`.
+
 ### Fork badge (client half)
 
 `lib/client.js` registers a compact, aria-labeled fork icon in
@@ -269,7 +277,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 73 node:test cases
+npm test                      # 76 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py
@@ -280,6 +288,7 @@ Layout:
 ```text
 lib/compose.js         title composition, vocabulary, byte budget (pure)
 lib/audit.js           read-only title audit over the projection cache
+lib/backfill.js        dry-run-first historical title backfill
 lib/client.js          browser half: fork icon in the Session row
 lib/branch.js          fork detection and inherited-title checks (read-only)
 lib/normalizer.js      title rewrite, type inference, settle listener

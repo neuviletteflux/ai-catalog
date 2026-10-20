@@ -17,6 +17,7 @@
  * @module dsh-session-naming
  */
 import { sessionTitleAuditTool } from './audit.js'
+import { sessionTitleBackfillTool } from './backfill.js'
 import { applyNormalizer, settleDelayOf } from './normalizer.js'
 import { registerTitleTools } from './title-tools.js'
 
@@ -69,6 +70,8 @@ export function apply(ctx, config) {
     disposers.push(registerTitleTools(ctx))
     const disposeAudit = ctx.tools.register(sessionTitleAuditTool())
     if (typeof disposeAudit === 'function') disposers.push(disposeAudit)
+    const disposeBackfill = ctx.tools.register(sessionTitleBackfillTool(ctx))
+    if (typeof disposeBackfill === 'function') disposers.push(disposeBackfill)
   }
   if (options.normalizer) disposers.push(applyNormalizer(ctx, options))
   return () => {

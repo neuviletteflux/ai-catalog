@@ -6,7 +6,7 @@
 
 | 半边 | 作用 |
 |---|---|
-| Agent 工具 | 新增 `set_session_title`（当前会话）、`rename_session`（按 id 改任意会话），以及只读的 `session_title_audit`。 |
+| Agent 工具 | 新增 `set_session_title`（当前会话）、`rename_session`（按 id 改任意会话）、只读的 `session_title_audit`，以及默认 dry-run 的 `session_title_backfill`。 |
 | 客户端 UI | 可选的 Session 行前分叉图标（client bundle 需要重启后加载）。 |
 | 自动规范化 | 监听 `session/title`，等自带摘要稳定后追加 `[Branch｜]MMDD｜类型｜目标`。 |
 
@@ -14,7 +14,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.4.3` |
+| 版本 | `0.5.0` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -146,6 +146,11 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 `Branch｜`、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日同目标
 重复（父子/分叉同目标单独计数，不算重复）。它不写标题、会话日志或投影缓存。
 
+`session_title_backfill` 是历史标题的写入路径：默认 dry-run，返回所有不合规顶层
+会话的建议；现标题保留为目标，只规范化日期、类型、`Branch｜` 和末尾 `(n)`。
+`apply: true` 才通过 Host 的 `sessionController.rename` 写入；子代理、已合规标题、
+缺运行序号的 `AUTO`、缺 `createdAt` 的会话跳过。应用前先看建议列表。
+
 ### 分叉徽标（客户端半侧）
 
 `lib/client.js` 在 `sidebar.session.row.leading` 注册一个紧凑、带 aria 标签的分叉
@@ -242,7 +247,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 73 项 node:test
+npm test                      # 76 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py
@@ -253,6 +258,7 @@ python3 scripts/validate_metadata.py
 ```text
 lib/compose.js         标题拼装、词表、字节预算（纯函数）
 lib/audit.js           投影缓存上的只读标题审计
+lib/backfill.js        默认 dry-run 的历史标题回填
 lib/client.js          浏览器半侧：Session 行分叉图标
 lib/branch.js          fork 判定与继承标题识别（只读）
 lib/normalizer.js      标题改写、类型推断、稳定窗口监听

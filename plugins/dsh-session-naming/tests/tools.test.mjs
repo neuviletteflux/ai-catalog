@@ -335,7 +335,7 @@ test('apply mounts both halves and disposes the tool registration', () => {
   }
   const dispose = apply(ctx, { settleMs: 0 })
   assert.equal(typeof listener, 'function')
-  assert.deepEqual(registered.map((tool) => tool.name), ['set_session_title', 'rename_session', 'session_title_audit'])
+  assert.deepEqual(registered.map((tool) => tool.name), ['set_session_title', 'rename_session', 'session_title_audit', 'session_title_backfill'])
   dispose()
   assert.equal(registered.length, 0)
   assert.equal(listener, undefined)
@@ -361,6 +361,6 @@ test('apply can mount one half at a time', () => {
   assert.equal(registered.length, 0)
   assert.equal(listens, 1)
   apply(ctx, { normalizer: false })
-  assert.equal(registered.length, 3)
+  assert.equal(registered.length, 4)
   assert.equal(listens, 1)
 })

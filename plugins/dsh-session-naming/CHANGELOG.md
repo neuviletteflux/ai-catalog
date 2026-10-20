@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-10-20
+
+- Add `session_title_backfill`: dry-run by default; scans non-compliant
+  top-level sessions and proposes `[Branch｜]MMDD｜type｜goal` titles using the
+  current title as the goal. `apply: true` writes through
+  `sessionController.rename`; subagents, compliant titles, `AUTO` without a run
+  index, and rows without `createdAt` are skipped.
+- The tool is dry-run first and returns the full proposal list, so a bulk
+  rewrite can be reviewed before it is applied.
+- Tests 73 → 76.
+
 ## 0.4.3 — 2026-10-20
 
 - Fix the `session_title_audit` output schema: `typeCounts.additionalProperties`
