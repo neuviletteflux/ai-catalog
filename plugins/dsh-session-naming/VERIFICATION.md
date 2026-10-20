@@ -217,7 +217,10 @@ profile。
 - 0.1.0–0.2.2 曾在运行中的 App 里连续热加载（`02:21:05`–`03:04:11`）。
   0.3.0、0.4.0、0.4.1、0.4.2 安装后**没有**新的 `loaded` 行：运行中的 App 仍停留在
   0.2.2，必须重启才会加载 `session_title_audit`、AUTO 收紧和 client 徽标。
-  这是本轮唯一未完成的激活步骤。
+  这是本轮唯一未完成的激活步骤。安装 0.4.2 时旧 host 半侧已被卸载，当前会话的
+  `set_session_title` 暂不可用；对安装目录直接 `apply()` 冒烟可注册
+  `set_session_title`、`rename_session`、`session_title_audit`，说明代码路径正常，
+  只差重启。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
   `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题）。
 - 0.2.1 的 `rename_session` 实测成功后，旧 fork `session-596df7d1…` 被自动规范化：
@@ -231,9 +234,11 @@ profile。
 
 ## 未验证 / 限制
 
-- **0.3.0+ 尚未在运行中的 App 激活**：0.3.0–0.4.2 安装后没有新的
-  `loaded` 行，运行中的 App 仍停留在 0.2.2；必须重启一次，才能加载
-  `session_title_audit`、AUTO 收紧和 client 分叉徽标。
+- **0.3.0+ 尚未在运行中的 App 激活，且当前 host 工具暂不可用**：0.3.0–0.4.2
+  安装后没有新的 `loaded` 行；0.4.2 安装时旧 host 半侧已被卸载，当前会话的
+  `set_session_title` / `rename_session` 不可用。安装目录的 `apply()` 冒烟通过
+  （注册三个工具），重启即可恢复并加载 `session_title_audit`、AUTO 收紧和 client
+  分叉徽标。
 - **P2 真实 UI 未视觉验证**：`lib/client.js` 只做了 mock 单测；分叉图标在真实
   侧边栏的排版、与主会话徽标共存、深浅色主题均未查看。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
