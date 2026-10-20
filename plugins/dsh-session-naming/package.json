@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-naming",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "DSH session-naming plugin: title tools, read-only audit, automatic normalization to [Branch｜]MMDD｜type｜goal, and an optional sidebar fork badge.",
   "icon": "assets/icon.svg",
   "type": "module",
@@ -60,7 +60,8 @@
       "inject": [
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-ui-workspace",
-        "@deepseek-ai/dsh-client-locale"
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-renderer"
       ]
     }
   },

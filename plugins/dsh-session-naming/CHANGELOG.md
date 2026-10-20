@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — 2026-10-20
+
+- Declare `@deepseek-ai/dsh-client-ui-renderer` in the client inject list, the
+  same renderer dependency the primary-session badge uses, so the leading seat
+  is available before the badge registers.
+
 ## 0.4.1 — 2026-10-20
 
 - `session_title_audit` now separates a parent and its fork sharing the same

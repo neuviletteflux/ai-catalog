@@ -91,11 +91,6 @@ npm test
   被回收。
 - 抽出 `lib/branch.js` 供工具与规范化器共用；测试 54 → 62。
 - 0.2.2 起 `rename_session` 对 fork 先去掉末尾 `(n)` 再加 `Branch｜`。
-- 0.3.0 新增只读 `session_title_audit`，并收紧 `AUTO`：必须带 `seq`，标题必须
-  以 `-NN` 结尾；测试 62 → 69。
-- 0.4.0 新增可选 client 半侧：Session 行前的分叉图标；测试 69 → 71。
-- 0.4.1 审计把父子/分叉同目标与真正重复分开；测试 71 → 72。
-  客户端 bundle 需要重启后加载，本轮无法在当前 App 内做视觉验证。
 - 0.2.1 修复 `rename_session`：直接调用 Host 的
   `sessionController.rename({ sessionId, title })`；旧的 `typertGateway.invoke`
   请求缺少 Peer 上下文，live 调用会报 `reading 'signal'`。
@@ -104,6 +99,30 @@ npm test
   `03:02:49.356Z … (user) → "Branch｜1016｜规划｜重构控制台页面方案"`；会话日志
   seq 1841 的 provider 修订带 `messageSeqs: [8]`，投影缓存同步为
   `Branch｜1016｜规划｜重构控制台页面方案`。
+
+### P1b AUTO 语义（0.3.0）
+
+- `composeTitle` 对 `AUTO` 要求 `seq`，生成 `-01`/`-02`；缺失直接拒绝。
+- `isConventionTitle` 要求 `AUTO` 标题以 `-NN` 结尾；`0105｜AUTO｜任务` 不算合规。
+- `set_session_title` 在改名前拒绝 AUTO 缺 seq；测试覆盖。
+
+### P1c 只读审计（0.3.0 / 0.4.1）
+
+- 新增 `session_title_audit`：扫描投影缓存，统计合规率、类型分布、分叉缺
+  `Branch｜`、分叉带 `(n)`、无效类型前缀、AUTO 缺序号、重复；默认 200 条，
+  最多 1000；不写任何文件。
+- 0.4.1 把父子/分叉同目标单独计入 `forkPairs`，不再算真重复。
+- 直接用安装后的 `lib/audit.js` 跑真实投影缓存（94 条顶层）：
+  `合规 68（72%），不合规 26；分叉缺 Branch 0，分叉带 (n) 0，无效类型前缀 0，
+  AUTO 缺序号 0，重复目标 0 组（另有 2 组父子/分叉同目标）`。
+
+### P2 客户端分叉徽标（0.4.0）
+
+- `lib/client.js` 在 `sidebar.session.row.leading` 注册 15px 分叉图标；条件是
+  `parentSessionId` 存在且 `origin !== "subagent"`；只是视觉辅助，标题仍保留
+  `Branch｜`。
+- 已做 mock 单测：谓词、seat 注册、locale、显示/隐藏；**尚未在真实 UI 视觉验证**。
+- client bundle 需要重启 App 后加载；Host 工具/规范化器不受影响。
 
 ### 元数据校验
 
@@ -123,7 +142,7 @@ cd plugins/dsh-session-naming
 npm pack --dry-run
 ```
 
-结果：17 个文件、29.9 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
+结果：17 个文件、30.0 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
 `assets/icon.svg`、两份 README、`CHANGELOG.md`、`LICENSE`、`plugin.yaml`、
 `package.json`；不包含 `tests/`。
 
@@ -173,9 +192,11 @@ profile。
 
 - 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）、
   `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）、`44adb41`（0.2.2
-  序号清理）已推送到 `origin/main`。
-- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1、0.2.0、0.2.1、
-  0.2.2 发布后分别再次 `remove` → `add`；当前锁文件解析到 `44adb41`：
+  序号清理）、`60d9725`（0.3.0 审计 + AUTO）、`5928e9a`（0.4.0 client 徽标）、
+  `0bbbb75`（0.4.1 审计分叉对）、`0.4.2`（client renderer 依赖）已推送到
+  `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1–0.4.1 发布后
+  分别再次 `remove` → `add`；当前锁文件解析到 `0bbbb75`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -185,16 +206,17 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.2.2`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `44adb41`。
+  结果：`+ dsh-session-naming 0.4.1`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `0bbbb75`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
   `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
   的 patch 备份。
-- 重新安装后运行中的 App 连续热加载：0.1.0 `02:21:05.069Z`、0.1.1
-  `02:46:40.015Z`、0.2.0 `03:00:43.615Z`、0.2.1 `03:02:38.479Z`、0.2.2
-  `03:04:11.959Z`，均为 `loaded (settleMs=10000)`。不需要等待重启；重启仍然安全。
+- 0.1.0–0.2.2 曾在运行中的 App 里连续热加载（`02:21:05`–`03:04:11`）。
+  0.3.0、0.4.0、0.4.1 安装后**没有**新的 `loaded` 行：运行中的 App 仍停留在
+  0.2.2，必须重启才会加载 `session_title_audit`、AUTO 收紧和 client 徽标。
+  这是本轮唯一未完成的激活步骤。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
   `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题）。
 - 0.2.1 的 `rename_session` 实测成功后，旧 fork `session-596df7d1…` 被自动规范化：
@@ -208,10 +230,15 @@ profile。
 
 ## 未验证 / 限制
 
-- **desktop 冷启动仍建议观察一次**：热加载已通过 `loaded (settleMs=10000)` 证明；
-  重启后的工具注册与标题改写属于同一代码路径，但冷启动本身未单独记录。
+- **0.3.0+ 尚未在运行中的 App 激活**：0.3.0–0.4.2 安装后没有新的
+  `loaded` 行，运行中的 App 仍停留在 0.2.2；必须重启一次，才能加载
+  `session_title_audit`、AUTO 收紧和 client 分叉徽标。
+- **P2 真实 UI 未视觉验证**：`lib/client.js` 只做了 mock 单测；分叉图标在真实
+  侧边栏的排版、与主会话徽标共存、深浅色主题均未查看。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
   的渲染未在桌面端实际查看。
+- **历史标题未回填**：审计的 94 条顶层会话中 26 条不合规（多为命名规范落地前的
+  旧标题）；`session_title_audit` 只报告，不改写。
 - **类型推断是加权启发式**：标题权重高于首条消息，但仍读不懂真实意图；偏了用
   `set_session_title` 修正。P0 只改判定，不回溯改写已有标题。
 - **分叉自动规范化只处理继承标题**：fork 上的人工改名、没有人类消息 seq 的 fork、
