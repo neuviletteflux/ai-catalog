@@ -7,14 +7,14 @@ a prompt-only instruction. The plugin has two halves:
 
 | Half | What it does |
 |---|---|
-| Agent tools | Adds `set_session_title` (current session) and `rename_session` (any session by id). |
+| Agent tools | Adds `set_session_title` (current session), `rename_session` (any session by id), and a read-only `session_title_audit`. |
 | Automatic normalizer | Watches `session/title`, waits for the built-in summary to settle, then appends `[Branch｜]MMDD｜类型｜目标`. |
 
 Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.2.2` |
+| Version | `0.3.0` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -31,7 +31,9 @@ automation run       MMDD｜AUTO｜任务名称        (repeat runs: -01, -02)
 
 - `MMDD` is the **session creation date**, not the day the title is written.
 - `类型` is one of `分析｜规划｜实施｜排障｜审计｜查询｜整理｜复盘｜AUTO`.
-- `AUTO` is reserved for automation runs; the normalizer never infers it.
+- `AUTO` is reserved for automation runs; the normalizer never infers it. The
+  tool requires `seq` for `AUTO` (emitting `-01`, `-02`), and a title without
+  `-NN` is not compliant.
 - The budget is the session-title service's `maxTitleBytes` (80 in the desktop
   bundle). The branch prefix counts toward it (`Branch｜` is 9 bytes).
 
@@ -147,6 +149,13 @@ sessions (the Host resumes them). It reads the projection cache to decide
 whether the target is a branch; when the cache is unreadable it does **not**
 guess and reports that no prefix was added.
 
+`session_title_audit` is read-only. It scans the projection cache and reports
+the compliance rate, type distribution, forks missing `Branch｜`, forks still
+carrying `(n)`, invalid type prefixes, `AUTO` titles without a run index, and
+same-day/same-goal duplicates. It never writes a title, session log, or
+projection cache.
+
+
 ### Type inference
 
 The type is not a first-match keyword scan. The title and the first human
@@ -250,7 +259,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 62 node:test cases
+npm test                      # 69 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py
@@ -260,6 +269,7 @@ Layout:
 
 ```text
 lib/compose.js         title composition, vocabulary, byte budget (pure)
+lib/audit.js           read-only title audit over the projection cache
 lib/branch.js          fork detection and inherited-title checks (read-only)
 lib/normalizer.js      title rewrite, type inference, settle listener
 lib/title-tools.js     set_session_title / rename_session definitions

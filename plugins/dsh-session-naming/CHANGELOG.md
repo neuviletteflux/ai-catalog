@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-10-20
+
+- Add the read-only `session_title_audit` tool: compliance rate, type
+  distribution, forks missing `Branch｜`, forks still carrying `(n)`, invalid
+  type prefixes, `AUTO` without `-NN`, and same-day/same-goal duplicates.
+- `AUTO` now requires a `seq`; `composeTitle` rejects `AUTO` without a run
+  index, and `isConventionTitle` treats `0105｜AUTO｜任务` (no `-NN`) as
+  non-compliant.
+- Tests 62 → 69.
+
 ## 0.2.2 — 2026-10-20
 
 - `rename_session` now strips a trailing `(n)` before adding `Branch｜` to a

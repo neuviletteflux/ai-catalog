@@ -16,6 +16,7 @@
  *
  * @module dsh-session-naming
  */
+import { sessionTitleAuditTool } from './audit.js'
 import { applyNormalizer, settleDelayOf } from './normalizer.js'
 import { registerTitleTools } from './title-tools.js'
 
@@ -64,7 +65,11 @@ export function normalizeConfig(config) {
 export function apply(ctx, config) {
   const options = normalizeConfig(config)
   const disposers = []
-  if (options.tools) disposers.push(registerTitleTools(ctx))
+  if (options.tools) {
+    disposers.push(registerTitleTools(ctx))
+    const disposeAudit = ctx.tools.register(sessionTitleAuditTool())
+    if (typeof disposeAudit === 'function') disposers.push(disposeAudit)
+  }
   if (options.normalizer) disposers.push(applyNormalizer(ctx, options))
   return () => {
     for (const dispose of disposers) {

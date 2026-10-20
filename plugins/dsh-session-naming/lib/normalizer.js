@@ -171,7 +171,12 @@ function scoreSignal(signal, title, message) {
 
 /** Whether a title already follows the convention. */
 export function isConventionTitle(title) {
-  return typeof title === 'string' && CONVENTION.test(oneLine(title))
+  if (typeof title !== 'string') return false
+  const text = oneLine(title)
+  if (!CONVENTION.test(text)) return false
+  const matched = /^(?:Branch｜)?\d{4}｜([^｜]+)｜/u.exec(text)
+  if (matched?.[1] === 'AUTO' && !/-\d{2}$/u.test(text)) return false
+  return true
 }
 
 /** Truncate to a byte budget without splitting a code point. */

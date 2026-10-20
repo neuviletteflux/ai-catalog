@@ -220,6 +220,16 @@ test('set_session_title refuses to overwrite a human title without force', async
   assert.equal(forced.title, '0105｜分析｜主题')
 })
 
+test('set_session_title rejects AUTO without a run index', async () => {
+  const service = makeService()
+  const tool = setSessionTitleTool(makeCtx(service))
+  assert.throws(
+    () => tool.execute({ type: 'AUTO', goal: '每日巡检' }, execFor(makeSession())),
+    /AUTO 任务需要 seq/u,
+  )
+  assert.equal(service.calls.rename.length, 0)
+})
+
 test('set_session_title reports service truncation', async () => {
   const service = makeService({ maxTitleBytes: 20 })
   const tool = setSessionTitleTool(makeCtx(service))
@@ -325,7 +335,7 @@ test('apply mounts both halves and disposes the tool registration', () => {
   }
   const dispose = apply(ctx, { settleMs: 0 })
   assert.equal(typeof listener, 'function')
-  assert.deepEqual(registered.map((tool) => tool.name), ['set_session_title', 'rename_session'])
+  assert.deepEqual(registered.map((tool) => tool.name), ['set_session_title', 'rename_session', 'session_title_audit'])
   dispose()
   assert.equal(registered.length, 0)
   assert.equal(listener, undefined)
@@ -351,6 +361,6 @@ test('apply can mount one half at a time', () => {
   assert.equal(registered.length, 0)
   assert.equal(listens, 1)
   apply(ctx, { normalizer: false })
-  assert.equal(registered.length, 2)
+  assert.equal(registered.length, 3)
   assert.equal(listens, 1)
 })

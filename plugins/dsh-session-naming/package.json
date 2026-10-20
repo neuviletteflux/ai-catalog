@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-naming",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "DSH session-naming plugin: set_session_title / rename_session tools plus automatic normalization of the built-in summary title to [Branch｜]MMDD｜type｜goal.",
   "icon": "assets/icon.svg",
   "type": "module",
@@ -26,7 +26,7 @@
     "assets"
   ],
   "scripts": {
-    "test": "node --test tests/compose.test.mjs tests/normalizer.test.mjs tests/tools.test.mjs"
+    "test": "node --test tests/compose.test.mjs tests/normalizer.test.mjs tests/tools.test.mjs tests/audit.test.mjs"
   },
   "keywords": [
     "dsh-plugin",

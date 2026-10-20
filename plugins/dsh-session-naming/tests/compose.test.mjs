@@ -80,6 +80,13 @@ test('composeTitle appends the automation run index', () => {
   )
 })
 
+test('composeTitle requires a run index for AUTO', () => {
+  assert.throws(
+    () => composeTitle({ type: 'AUTO', goal: '每日巡检' }, createdAt, 80),
+    /AUTO 任务需要 seq/u,
+  )
+})
+
 test('composeTitle reports the available goal budget when over the limit', () => {
   const goal = '很长的目标'.repeat(12)
   assert.throws(

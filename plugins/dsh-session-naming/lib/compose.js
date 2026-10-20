@@ -108,6 +108,9 @@ export function composeTitle(input, createdAt, maxBytes = DEFAULT_MAX_TITLE_BYTE
   const label = normalizeType(input?.type)
   const target = normalizeGoal(input?.goal)
   const index = normalizeSeq(input?.seq)
+  if (label === 'AUTO' && index === undefined) {
+    throw new Error('session-naming: AUTO 任务需要 seq（同一任务同一天的运行序号）')
+  }
   const suffix = index === undefined ? '' : `-${pad2(index)}`
   const head = input?.branch === true ? branchPrefix() : ''
   const title = `${head}${monthDayOf(createdAt)}${SEPARATOR}${label}${SEPARATOR}${target}${suffix}`

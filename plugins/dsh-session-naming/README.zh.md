@@ -6,14 +6,14 @@
 
 | 半边 | 作用 |
 |---|---|
-| Agent 工具 | 新增 `set_session_title`（当前会话）与 `rename_session`（按 id 改任意会话）。 |
+| Agent 工具 | 新增 `set_session_title`（当前会话）、`rename_session`（按 id 改任意会话），以及只读的 `session_title_audit`。 |
 | 自动规范化 | 监听 `session/title`，等自带摘要稳定后追加 `[Branch｜]MMDD｜类型｜目标`。 |
 
 社区插件，不是 DeepSeek 官方产品。
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.2.2` |
+| 版本 | `0.3.0` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -30,7 +30,8 @@
 
 - `MMDD` 取**会话创建日**，不是写标题的日期。
 - `类型` 取 `分析｜规划｜实施｜排障｜审计｜查询｜整理｜复盘｜AUTO`。
-- `AUTO` 专供自动化运行；规范化器不会推断出 `AUTO`。
+- `AUTO` 专供自动化运行；规范化器不会推断出 `AUTO`。工具要求 `AUTO` 带 `seq`
+  （生成 `-01`、`-02`），没有 `-NN` 的标题不算合规。
 - 预算取标题服务的 `maxTitleBytes`（桌面 bundle 当前为 80 字节）。`Branch｜`
   前缀占 9 字节。
 
@@ -140,6 +141,11 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 改名）。它读取投影缓存判断目标是否分支；缓存不可读时**不猜**，并在结果里说明未加
 前缀。
 
+`session_title_audit` 是只读工具：扫描投影缓存，报告合规率、类型分布、分叉缺
+`Branch｜`、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日同目标
+重复。它不写标题、会话日志或投影缓存。
+
+
 ### 类型判定
 
 类型不是按固定顺序取第一个关键词，而是分别给标题与首条人类消息打分：
@@ -228,7 +234,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 62 项 node:test
+npm test                      # 69 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py
@@ -238,6 +244,7 @@ python3 scripts/validate_metadata.py
 
 ```text
 lib/compose.js         标题拼装、词表、字节预算（纯函数）
+lib/audit.js           投影缓存上的只读标题审计
 lib/branch.js          fork 判定与继承标题识别（只读）
 lib/normalizer.js      标题改写、类型推断、稳定窗口监听
 lib/title-tools.js     set_session_title / rename_session 定义

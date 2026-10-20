@@ -107,6 +107,12 @@ test('pickType weights title actions above prompt question words', () => {
   }
 })
 
+test('isConventionTitle requires a run index for AUTO', () => {
+  assert.equal(isConventionTitle('0105｜AUTO｜每日巡检-01'), true)
+  assert.equal(isConventionTitle('Branch｜0105｜AUTO｜每日巡检-02'), true)
+  assert.equal(isConventionTitle('0105｜AUTO｜每日巡检'), false)
+})
+
 test('truncateBytes never splits a code point', () => {
   assert.equal(truncateBytes('中文abc', 6), '中文')
   assert.equal(truncateBytes('中文abc', 7), '中文a')
