@@ -48,7 +48,7 @@ function makeService({ title, source = { kind: 'fallback' }, messageSeqs = [1], 
   }
 }
 
-function makeCtx(service, { gateway } = {}) {
+function makeCtx(service, { controller } = {}) {
   const registered = []
   const ctx = {
     sessionTitle: service,
@@ -61,7 +61,7 @@ function makeCtx(service, { gateway } = {}) {
         }
       },
     },
-    get: (name) => (name === 'typertGateway' ? gateway : undefined),
+    get: (name) => (name === 'sessionController' ? controller : undefined),
     registered,
   }
   return ctx
@@ -239,16 +239,16 @@ test('set_session_title rejects a goal over the byte budget before renaming', as
   assert.equal(service.calls.rename.length, 0)
 })
 
-test('rename_session uses the gateway and derives the branch prefix from the cache', async () => {
+test('rename_session uses the session controller and derives the branch prefix from the cache', async () => {
   await writeProjection('session-branch', { identity: { isSeeded: true } })
   const calls = []
-  const gateway = {
-    invoke: async (request) => {
+  const controller = {
+    rename: async (request) => {
       calls.push(request)
-      return { title: request.args.request.title, seq: 7 }
+      return { title: request.title, seq: 7 }
     },
   }
-  const tool = renameSessionTool(makeCtx(makeService(), { gateway }))
+  const tool = renameSessionTool(makeCtx(makeService(), { controller }))
   const result = await tool.execute(
     { sessionId: 'session-branch', title: '1016｜实施｜存量整理' },
     { signal: 'signal' },
@@ -257,27 +257,25 @@ test('rename_session uses the gateway and derives the branch prefix from the cac
   assert.equal(result.branch, true)
   assert.equal(result.seq, 7)
   assert.deepEqual(calls[0], {
-    namespace: 'session',
-    method: 'rename',
-    args: { request: { sessionId: 'session-branch', title: 'Branch｜1016｜实施｜存量整理' } },
-    signal: 'signal',
+    sessionId: 'session-branch',
+    title: 'Branch｜1016｜实施｜存量整理',
   })
 })
 
 test('rename_session lets an explicit branch flag override the cache', async () => {
   await writeProjection('session-plain', { identity: { isSeeded: true } })
-  const gateway = { invoke: async (request) => ({ title: request.args.request.title }) }
-  const tool = renameSessionTool(makeCtx(makeService(), { gateway }))
+  const controller = { rename: async (request) => ({ title: request.title }) }
+  const tool = renameSessionTool(makeCtx(makeService(), { controller }))
   const result = await tool.execute({ sessionId: 'session-plain', title: '1016｜查询｜主题', branch: false }, {})
   assert.equal(result.title, '1016｜查询｜主题')
   assert.equal(result.branch, false)
 })
 
-test('rename_session fails clearly without the gateway or with empty input', async () => {
+test('rename_session fails clearly without the session controller or with empty input', async () => {
   const tool = renameSessionTool(makeCtx(makeService()))
   await assert.rejects(
     () => tool.execute({ sessionId: 'session-x', title: '1016｜查询｜主题' }),
-    /typertGateway/u,
+    /sessionController/u,
   )
   await assert.rejects(() => tool.execute({ sessionId: ' ', title: '主题' }), /sessionId 不能为空/u)
   await assert.rejects(() => tool.execute({ sessionId: 'session-x', title: '  ' }), /title 不能为空/u)

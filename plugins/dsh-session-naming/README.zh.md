@@ -13,7 +13,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.2.0` |
+| 版本 | `0.2.1` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -135,9 +135,10 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 1. 去掉 `(n)` 后等于父会话当前标题；
 2. 它是本分支日志里的第一条标题事件，且没有人工 `messageSeqs`。
 
-`rename_session` 走与 Web GUI 相同的 `session.rename` 网关，因此可以改非活跃会话
-（由网关恢复后改名）。它读取投影缓存判断目标是否分支；缓存不可读时**不猜**，并在
-结果里说明未加前缀。
+`rename_session` 调用 Host 的 `sessionController.rename`（Web GUI 的
+`session.rename` remote 背后同一业务方法），因此可以改非活跃会话（由 Host 恢复后
+改名）。它读取投影缓存判断目标是否分支；缓存不可读时**不猜**，并在结果里说明未加
+前缀。
 
 ### 类型判定
 
@@ -193,9 +194,9 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 - `ctx.sessionTitle`（`get`、`rename`、`config.maxTitleBytes`）；
 - `ctx.tools.register`；
 - `session.append('session/title', …)` 与 `session.header.createdAt`；
-- `rename_session` 另需 `typertGateway`（`session.rename`）。
+- `rename_session` 另需 `sessionController`（`rename`）。
 
-缺少 `typertGateway` 时只有 `rename_session` 失败，并明确报告服务未挂载；缺少标题
+缺少 `sessionController` 时只有 `rename_session` 失败，并明确报告服务未挂载；缺少标题
 服务时插件不会激活。`engines.dsh` 只是目标范围，不是兼容性承诺；只有上面的版本
 经过实际验证。
 

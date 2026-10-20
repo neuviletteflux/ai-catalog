@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 — 2026-10-20
+
+- Fix `rename_session`: call the Host `sessionController.rename({ sessionId,
+  title })` directly. The previous `typertGateway.invoke` request lacked the
+  Peer context required by the gateway and failed live with
+  `Cannot read properties of undefined (reading 'signal')`.
+- Docs now name `sessionController` as the dependency; `typertGateway` is no
+  longer used.
+
 ## 0.2.0 — 2026-10-20
 
 - Fork children that still carry the inherited `父标题 (n)` are normalized

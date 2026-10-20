@@ -7,8 +7,9 @@
  *
  * - `set_session_title`: rename the current session, composing
  *   `[Branch｜]MMDD｜type｜goal` from structured fields.
- * - `rename_session`: rename any session through the same `session.rename`
- *   gateway the Web GUI uses, for explicitly requested cleanups.
+ * - `rename_session`: rename any session through the Host's
+ *   `sessionController.rename`, the business method behind the Web GUI's
+ *   `session.rename` remote.
  *
  * No `@deepseek-ai/*` imports: the package may be mounted outside the profile
  * directory, where bare package resolution is not guaranteed.
@@ -52,7 +53,7 @@ const SET_TITLE_DESCRIPTION = [
 ].join(' ')
 
 const RENAME_DESCRIPTION = [
-  '按会话 id 重命名任意会话，走与 Web GUI 相同的原生 `session.rename` 通道（非活跃会话由网关恢复后改名）。',
+  '按会话 id 重命名任意会话，调用 Host 的 `sessionController.rename`（Web GUI 的 `session.rename` 背后同一业务方法；非活跃会话由 Host 恢复后改名）。',
   '仅用于用户明确要求的存量会话整理：先只读盘点并把建议标题清单交用户确认，再逐条调用，最后用同一来源复核。',
   '目标会话是分支（fork）时会自动加 `Branch｜` 前缀（可用 branch 参数显式指定或关闭）。',
   '无法判断目标的空白会话不要凭空命名；不改归档状态，也不直接写会话日志或投影缓存。',
@@ -155,24 +156,19 @@ export function renameSessionTool(ctx) {
       },
       render: (_args, value) => [{ type: 'text', text: value.message }],
     },
-    async execute(args, exec) {
+    async execute(args) {
       if (typeof args.sessionId !== 'string' || args.sessionId.trim() === '') {
         throw new Error('session-naming: sessionId 不能为空')
       }
       const input = oneLine(args.title)
       if (input === '') throw new Error('session-naming: title 不能为空')
-      const gateway = ctx.get('typertGateway')
-      if (gateway === undefined) {
-        throw new Error('session-naming: rename_session 需要 api-gateway（typertGateway）服务，当前部署未挂载')
+      const controller = ctx.get('sessionController')
+      if (controller === undefined) {
+        throw new Error('session-naming: rename_session 需要 sessionController 服务，当前部署未挂载')
       }
       const detected = typeof args.branch === 'boolean' ? args.branch : branchFromProjectionCache(args.sessionId)
       const title = ensureBranchPrefix(input, detected === true)
-      const result = await gateway.invoke({
-        namespace: 'session',
-        method: 'rename',
-        args: { request: { sessionId: args.sessionId, title } },
-        signal: exec.signal,
-      })
+      const result = await controller.rename({ sessionId: args.sessionId, title })
       const accepted = result?.title ?? title
       const notes = []
       if (detected === true) notes.push(hasBranchPrefix(input) ? '分支会话（前缀已在标题里）' : '分支会话，已加 Branch｜ 前缀')

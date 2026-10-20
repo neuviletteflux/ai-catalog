@@ -10,7 +10,7 @@
 - 工具层完整移植：
   - `set_session_title`：按会话创建日拼 `[Branch｜]MMDD｜类型｜目标`，校验词表、
     `seq` 与字节预算；分叉会话自动加 `Branch｜`；返回服务实际接受的标题与字节数。
-  - `rename_session`：走与 Web GUI 相同的 `session.rename` 网关；按投影缓存判断
+  - `rename_session`：调用 Host 的 `sessionController.rename`（Web GUI 同一业务方法）；按投影缓存判断
     分支，缓存不可读时不猜。
   - 人工标题保护：`source.kind = "user"` 默认拒绝覆盖；分叉继承的
     「父标题 (1)」用父标题匹配或“首条空 `messageSeqs` 标题事件”两条独立证据放行。

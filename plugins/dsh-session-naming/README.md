@@ -14,7 +14,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.2.0` |
+| Version | `0.2.1` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -141,10 +141,11 @@ by two independent checks:
 1. stripping `(n)` yields the parent's current title;
 2. it is the first title event in the branch, with no human `messageSeqs`.
 
-`rename_session` goes through the same `session.rename` gateway as the Web GUI,
-so it can rename inactive sessions (the gateway resumes them). It reads the
-projection cache to decide whether the target is a branch; when the cache is
-unreadable it does **not** guess and reports that no prefix was added.
+`rename_session` calls the Host's `sessionController.rename`, the same business
+method behind the Web GUI's `session.rename` remote, so it can rename inactive
+sessions (the Host resumes them). It reads the projection cache to decide
+whether the target is a branch; when the cache is unreadable it does **not**
+guess and reports that no prefix was added.
 
 ### Type inference
 
@@ -211,10 +212,10 @@ Verified against the DSH Desktop `0.2.1-rc.2` session-title service. It needs:
 - `ctx.sessionTitle` (`get`, `rename`, `config.maxTitleBytes`);
 - `ctx.tools.register`;
 - `session.append('session/title', …)` and `session.header.createdAt`;
-- for `rename_session`, `typertGateway` (`session.rename`).
+- for `rename_session`, `sessionController` (`rename`).
 
-If `typertGateway` is absent, only `rename_session` fails; it reports the missing
-service instead of writing anything. If the title service is absent, the plugin
+If `sessionController` is absent, only `rename_session` fails; it reports the
+missing service instead of writing anything. If the title service is absent, the plugin
 does not activate. `engines.dsh` is a target range, not a compatibility promise;
 only the version above has been exercised.
 
