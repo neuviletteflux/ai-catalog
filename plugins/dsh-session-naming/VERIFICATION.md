@@ -75,7 +75,7 @@ npm test
   子代理，避免给 subagent 加 `Branch｜`。
 - 新增回归：8 条误判样例、未知类型前缀、subagent 分支；测试 51 → 54。
 
-### P1a 分叉自动规范化（0.2.0 / 0.2.1）
+### P1a 分叉自动规范化（0.2.0–0.2.2）
 
 - fork 子会话仍带着继承的 `父标题 (n)` 时，自动改写成
   `Branch｜MMDD｜类型｜目标`，并去掉末尾 `(n)`。
@@ -163,9 +163,10 @@ profile。
 ## desktop profile 安装与清理记录（2026-10-20）
 
 - 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）、
-  `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）已推送到 `origin/main`。
-- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1、0.2.0、0.2.1
-  发布后分别再次 `remove` → `add`；当前锁文件解析到 `438f8e6`：
+  `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）、`44adb41`（0.2.2
+  序号清理）已推送到 `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1、0.2.0、0.2.1、
+  0.2.2 发布后分别再次 `remove` → `add`；当前锁文件解析到 `44adb41`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -175,20 +176,23 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.2.1`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `438f8e6`。
+  结果：`+ dsh-session-naming 0.2.2`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `44adb41`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
   `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
   的 patch 备份。
 - 重新安装后运行中的 App 连续热加载：0.1.0 `02:21:05.069Z`、0.1.1
-  `02:46:40.015Z`、0.2.0 `03:00:43.615Z`、0.2.1 `03:02:38.479Z`，均为
-  `loaded (settleMs=10000)`。不需要等待重启；重启仍然安全。
+  `02:46:40.015Z`、0.2.0 `03:00:43.615Z`、0.2.1 `03:02:38.479Z`、0.2.2
+  `03:04:11.959Z`，均为 `loaded (settleMs=10000)`。不需要等待重启；重启仍然安全。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
   `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题）。
 - 0.2.1 的 `rename_session` 实测成功后，旧 fork `session-596df7d1…` 被自动规范化：
   `03:02:49.356Z` 的日志与 seq 1841 的 provider 修订（`messageSeqs: [8]`）见上。
+- 0.2.2 的 `rename_session` 实测：对同一 fork 传入
+  `Branch｜1016｜规划｜重构控制台页面方案 (1)`，返回
+  `Branch｜1016｜规划｜重构控制台页面方案`，并提示「已去掉末尾的 (n)」。
 - `dsh --profile desktop --dump-config` 被应用拒绝
   （`profile "desktop" is managed exclusively by the Electron application`），
   因此组合结果以 profile `package.json` 与安装目录为准。
