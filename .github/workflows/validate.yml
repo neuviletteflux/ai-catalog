@@ -38,10 +38,18 @@ jobs:
         working-directory: plugins/dsh-primary-session
         run: npm test
 
+      - name: Test dsh-session-naming
+        working-directory: plugins/dsh-session-naming
+        run: npm test
+
       - name: Check dsh-draft-rows package contents
         working-directory: plugins/dsh-draft-rows
         run: npm pack --dry-run
 
       - name: Check dsh-primary-session package contents
         working-directory: plugins/dsh-primary-session
+        run: npm pack --dry-run
+
+      - name: Check dsh-session-naming package contents
+        working-directory: plugins/dsh-session-naming
         run: npm pack --dry-run

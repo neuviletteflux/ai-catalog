@@ -1,0 +1,18 @@
+# Mount dsh-session-naming into a DSH profile.
+#
+# The package is a Host-only Profile Bundle: package.json declares
+# `dsh.bundle.patch`, and this patch inserts one Loader row. Installing it also
+# selects the bundle, so no extra home-level patch is needed.
+#
+#   dsh plugin --profile web add 'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
+#
+# Do not combine this with a home-level patch that imports lib/index.js
+# directly: both sources register `set_session_title` and `rename_session`.
+#
+- insert:
+    - id: session-naming
+      name: 'dsh-session-naming'
+      config:
+        settleMs: 10000
+        tools: true
+        normalizer: true

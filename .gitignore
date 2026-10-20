@@ -225,3 +225,5 @@ __marimo__/
 !plugins/dsh-draft-rows/lib/**
 !plugins/dsh-primary-session/lib/
 !plugins/dsh-primary-session/lib/**
+!plugins/dsh-session-naming/lib/
+!plugins/dsh-session-naming/lib/**

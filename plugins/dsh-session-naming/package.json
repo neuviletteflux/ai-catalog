@@ -1,0 +1,61 @@
+{
+  "name": "dsh-session-naming",
+  "version": "0.1.0",
+  "description": "DSH session-naming plugin: set_session_title / rename_session tools plus automatic normalization of the built-in summary title to [Branch｜]MMDD｜type｜goal.",
+  "icon": "assets/icon.svg",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./assets/icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "plugin.yaml",
+    "locale",
+    "assets"
+  ],
+  "scripts": {
+    "test": "node --test tests/compose.test.mjs tests/normalizer.test.mjs tests/tools.test.mjs"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "session",
+    "title",
+    "naming",
+    "rename",
+    "tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuviletteflux/ai-catalog.git",
+    "directory": "plugins/dsh-session-naming"
+  },
+  "homepage": "https://github.com/neuviletteflux/ai-catalog/tree/main/plugins/dsh-session-naming",
+  "bugs": "https://github.com/neuviletteflux/ai-catalog/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "license": "MIT"
+}

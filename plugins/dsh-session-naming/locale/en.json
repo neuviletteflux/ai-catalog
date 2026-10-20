@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session Naming (dsh-session-naming)",
+    "description": "Agent title tools plus automatic [Branch｜]MMDD｜type｜goal normalization for DSH sessions."
+  }
+}

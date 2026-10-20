@@ -1,0 +1,288 @@
+/**
+ * dsh-session-naming / title-tools.js
+ *
+ * Agent-facing title tools. DSH's session-title service exposes `rename()` to
+ * the Web GUI and plugins only; this module supplies the missing agent entry
+ * points and encodes the local convention as validation.
+ *
+ * - `set_session_title`: rename the current session, composing
+ *   `[Branch｜]MMDD｜type｜goal` from structured fields.
+ * - `rename_session`: rename any session through the same `session.rename`
+ *   gateway the Web GUI uses, for explicitly requested cleanups.
+ *
+ * No `@deepseek-ai/*` imports: the package may be mounted outside the profile
+ * directory, where bare package resolution is not guaranteed.
+ *
+ * @module dsh-session-naming/title-tools
+ */
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import {
+  composeTitle, ensureBranchPrefix, hasBranchPrefix, oneLine, utf8Bytes,
+  DEFAULT_MAX_TITLE_BYTES, TYPES,
+} from './compose.js'
+
+/** Protect only titles a person really decided; automatic and inherited fork titles stay replaceable. */
+export function guardHumanTitle(session, previous, force) {
+  if (previous === undefined) return
+  if (previous.source?.kind !== 'user') return
+  if (force === true) return
+  if (isInheritedForkTitle(session, previous)) return
+  throw new Error(
+    `session-naming: 当前标题 "${previous.title}" 已由显式重命名确定，默认不覆盖；`
+    + '仅当用户明确要求改名时才带 force: true 重试',
+  )
+}
+
+/** DSH home, used only to read existing session projections. */
+export function dshHome() {
+  const fromEnv = process.env.DSH_HOME
+  return typeof fromEnv === 'string' && fromEnv !== '' ? fromEnv : join(homedir(), '.dsh')
+}
+
+/** Read a session's current title from the read-only projection cache. */
+export function titleFromProjectionCache(sessionId) {
+  try {
+    const path = join(dshHome(), 'storages', 'session_projcache', 'sessions', `${sessionId}.json`)
+    const record = JSON.parse(readFileSync(path, 'utf8'))
+    const title = record?.record?.rows?.title?.val
+    return typeof title === 'string' ? title : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Remove a fork index suffix: `parent (1)` / `parent（2）` → `parent`. */
+export function forkTitleBase(title) {
+  const text = oneLine(title)
+  const matched = /^(?<base>.*?)\s*[（(]\d+[)）]$/u.exec(text)
+  return matched?.groups?.base === undefined ? text : matched.groups.base.trim()
+}
+
+/** First title event in the session log (written by the GUI when forking). */
+export function firstTitleEvent(session) {
+  try {
+    const events = typeof session?.snapshotEvents === 'function' ? session.snapshotEvents() : []
+    return events.find((event) => event?.type === 'session/title')
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Whether the current title is only the inherited fork title.
+ *
+ * The Web GUI writes `parent title (1)` as a `source.kind = "user"` title when
+ * forking, which is indistinguishable from a human rename by shape alone. Two
+ * independent pieces of evidence identify inheritance:
+ *   1. stripping `(n)` yields the parent's current title;
+ *   2. it is the first title event in this branch and no newer title exists.
+ * @param session - target session (must carry `header.parentSession`).
+ * @param previous - current title snapshot.
+ * @returns true when the title may be replaced by the convention title.
+ */
+export function isInheritedForkTitle(session, previous) {
+  const parentId = session?.header?.parentSession
+  if (typeof parentId !== 'string' || parentId === '') return false
+  const parentTitle = titleFromProjectionCache(parentId)
+  if (typeof parentTitle === 'string' && oneLine(parentTitle) !== ''
+    && forkTitleBase(previous.title) === oneLine(parentTitle)) {
+    return true
+  }
+  const first = firstTitleEvent(session)
+  return first?.data?.title === previous.title && (first?.data?.messageSeqs?.length ?? 0) === 0
+}
+
+/** The service's byte budget is the convention budget; fall back when unreadable. */
+function budgetOf(service) {
+  const value = service?.config?.maxTitleBytes
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_TITLE_BYTES
+}
+
+/** Whether the session is a branch (fork): `header.isSeeded` is written by storage. */
+export function isBranchSession(session) {
+  if (session?.header?.isSeeded === true) return true
+  const inherited = session?.inheritedEventCount
+  return typeof inherited === 'number' && inherited > 0
+}
+
+/**
+ * Read whether a session is a branch from its projection cache.
+ * @returns `true`/`false`, or `undefined` when the cache is unreadable (never guess).
+ */
+export function branchFromProjectionCache(sessionId) {
+  try {
+    const path = join(dshHome(), 'storages', 'session_projcache', 'sessions', `${sessionId}.json`)
+    const record = JSON.parse(readFileSync(path, 'utf8'))
+    const identity = record?.record?.identity
+    if (identity === undefined) return undefined
+    if (typeof identity.isSeeded === 'boolean') {
+      return identity.isSeeded || (identity.inheritedEventCount ?? 0) > 0
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
+const SET_TITLE_DESCRIPTION = [
+  '设置当前会话的标题，遵循本机命名规范：普通会话 `MMDD｜类型｜目标`，',
+  '分支（由其他会话 fork 出来的）会话 `Branch｜MMDD｜类型｜目标`——是否为分支由工具自动判定，不要自己加前缀；',
+  '自动化运行会话 `MMDD｜AUTO｜任务名称`（同一任务同一天多次运行追加 `-01`、`-02`）。',
+  `MMDD 取该会话的创建日期，由本工具自动填入。类型从 ${TYPES.join('、')} 中选择。`,
+  '目标写“要理解或完成的事”，不写执行过程，也不写“完成/进行中/待确认”等状态。',
+  '目标明确后再调用，同一会话通常只命名一次。返回服务规范化后实际生效的标题与字节数，以此为准。',
+  '标题已由显式重命名确定时默认拒绝覆盖，仅在用户明确要求改名时才带 force: true。',
+].join(' ')
+
+const RENAME_DESCRIPTION = [
+  '按会话 id 重命名任意会话，走与 Web GUI 相同的原生 `session.rename` 通道（非活跃会话由网关恢复后改名）。',
+  '仅用于用户明确要求的存量会话整理：先只读盘点并把建议标题清单交用户确认，再逐条调用，最后用同一来源复核。',
+  '目标会话是分支（fork）时会自动加 `Branch｜` 前缀（可用 branch 参数显式指定或关闭）。',
+  '无法判断目标的空白会话不要凭空命名；不改归档状态，也不直接写会话日志或投影缓存。',
+].join(' ')
+
+/** `set_session_title` tool definition. */
+export function setSessionTitleTool(ctx) {
+  return {
+    name: 'set_session_title',
+    description: SET_TITLE_DESCRIPTION,
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        type: { type: 'string', description: `类型词：${TYPES.join('｜')}。自动化运行会话用 AUTO。` },
+        goal: { type: 'string', description: '简短具体的目标（要理解或完成的事），不写状态；建议 20 个汉字以内。' },
+        seq: { type: 'integer', description: '同一任务同一天的运行序号（1-99，仅自动化运行会话需要），会拼成 -01、-02。' },
+        raw: { type: 'string', description: '完整标题原文，跳过规范拼装；仅当用户明确指定了标题时使用（分支前缀仍会自动补上）。' },
+        force: { type: 'boolean', description: '覆盖已由显式重命名确定的标题；只在用户明确要求改名时使用。' },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['title', 'bytes', 'budget', 'truncated', 'previous', 'branch', 'message'],
+        properties: {
+          title: { type: 'string' },
+          bytes: { type: 'integer' },
+          budget: { type: 'integer' },
+          truncated: { type: 'boolean' },
+          previous: { type: 'string' },
+          branch: { type: 'boolean' },
+          message: { type: 'string' },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: value.message }],
+    },
+    execute(args, exec) {
+      const agent = exec.agent
+      if (agent === undefined) throw new Error('session-naming: set_session_title 只能在 agent 会话内调用')
+      const session = agent.session
+      const service = ctx.sessionTitle
+      const budget = budgetOf(service)
+      const previous = service.get(session)
+      const previousTitle = previous?.title ?? ''
+      guardHumanTitle(session, previous, args.force === true)
+
+      const branch = isBranchSession(session)
+      const raw = typeof args.raw === 'string' && args.raw.trim() !== '' ? oneLine(args.raw) : undefined
+      const title = raw === undefined
+        ? composeTitle({ type: args.type, goal: args.goal, seq: args.seq, branch }, session.header?.createdAt, budget)
+        : ensureBranchPrefix(raw, branch)
+      const accepted = service.rename(session, title)
+      const bytes = utf8Bytes(accepted.title)
+      const truncated = accepted.title !== title
+      const branchNote = branch ? '，分支会话已加 Branch｜ 前缀' : ''
+      return Promise.resolve({
+        title: accepted.title,
+        bytes,
+        budget,
+        truncated,
+        previous: previousTitle,
+        branch,
+        message: truncated
+          ? `标题超过 ${budget} 字节，已截断为 "${accepted.title}"（${bytes} 字节）`
+          : `已将会话标题设为 "${accepted.title}"（${bytes}/${budget} 字节${branchNote}）`,
+      })
+    },
+  }
+}
+
+/** `rename_session` tool definition. */
+export function renameSessionTool(ctx) {
+  return {
+    name: 'rename_session',
+    description: RENAME_DESCRIPTION,
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['sessionId', 'title'],
+      properties: {
+        sessionId: { type: 'string', description: '目标会话 id，形如 session-<uuid>。' },
+        title: { type: 'string', description: '要设置的完整标题，遵循 `[Branch｜]MMDD｜类型｜目标`（未带前缀且判定为分支时自动补）。' },
+        branch: { type: 'boolean', description: '显式指定该会话是否为分支；省略时按投影缓存里的 isSeeded 自动判定。' },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['sessionId', 'title', 'seq', 'branch', 'message'],
+        properties: {
+          sessionId: { type: 'string' },
+          title: { type: 'string' },
+          seq: { type: 'integer' },
+          branch: { type: 'boolean' },
+          message: { type: 'string' },
+        },
+      },
+      render: (_args, value) => [{ type: 'text', text: value.message }],
+    },
+    async execute(args, exec) {
+      if (typeof args.sessionId !== 'string' || args.sessionId.trim() === '') {
+        throw new Error('session-naming: sessionId 不能为空')
+      }
+      const input = oneLine(args.title)
+      if (input === '') throw new Error('session-naming: title 不能为空')
+      const gateway = ctx.get('typertGateway')
+      if (gateway === undefined) {
+        throw new Error('session-naming: rename_session 需要 api-gateway（typertGateway）服务，当前部署未挂载')
+      }
+      const detected = typeof args.branch === 'boolean' ? args.branch : branchFromProjectionCache(args.sessionId)
+      const title = ensureBranchPrefix(input, detected === true)
+      const result = await gateway.invoke({
+        namespace: 'session',
+        method: 'rename',
+        args: { request: { sessionId: args.sessionId, title } },
+        signal: exec.signal,
+      })
+      const accepted = result?.title ?? title
+      const notes = []
+      if (detected === true) notes.push(hasBranchPrefix(input) ? '分支会话（前缀已在标题里）' : '分支会话，已加 Branch｜ 前缀')
+      else if (detected === undefined) notes.push('未能判定是否分支，未加前缀（可用 branch 参数指定）')
+      if (accepted !== title) notes.push(`超过字节上限，已截断为 ${utf8Bytes(accepted)} 字节`)
+      return {
+        sessionId: args.sessionId,
+        title: accepted,
+        seq: Number.isInteger(result?.seq) ? result.seq : 0,
+        branch: detected === true,
+        message: `已把 ${args.sessionId} 的标题设为 "${accepted}"${notes.length === 0 ? '' : `（${notes.join('；')}）`}`,
+      }
+    },
+  }
+}
+
+/** Register both tools; the returned disposer unregisters them. */
+export function registerTitleTools(ctx) {
+  const disposers = [
+    ctx.tools.register(setSessionTitleTool(ctx)),
+    ctx.tools.register(renameSessionTool(ctx)),
+  ]
+  return () => {
+    for (const dispose of disposers) {
+      if (typeof dispose === 'function') dispose()
+    }
+  }
+}

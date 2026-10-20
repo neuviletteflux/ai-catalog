@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "会话命名 (dsh-session-naming)",
+    "description": "给 agent 提供会话改名工具，并把自动摘要标题规范成 [Branch｜]MMDD｜类型｜目标。"
+  }
+}
