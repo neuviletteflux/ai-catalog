@@ -127,10 +127,34 @@ profile：
 `node_modules` 符号链接、从备份恢复 `~/.dsh-alpha/cordis.patch.yml`。未改动 desktop
 profile。
 
+## desktop profile 安装记录（2026-10-20）
+
+- 提交 `d818e7d` 已推送到 `origin/main`。
+- 使用应用自带 CLI 从 GitHub 安装到 desktop：
+
+  ```bash
+  '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
+    plugin --profile desktop add \
+    'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
+  ```
+
+  结果：`+ dsh-session-naming 0.1.0`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均已包含该包，安装目录版本为 `0.1.0`。
+- `~/.dsh/cordis.patch.yml` 中两段旧 insert（`session-naming`、
+  `session-naming-normalizer`）已替换为迁移说明。YAML 解析通过，全文不再有
+  `session-naming` 的挂载值。
+- 运行中的 App 尚未重启：旧插件仍处于已加载状态，因此当前会话工具仍可用；已用
+  `set_session_title` 设置 `1020｜实施｜会话命名打包为 DSH 插件`（48/80 字节）。
+  重启后旧插件不再加载，由 profile bundle 接管。
+- `dsh --profile desktop --dump-config` 被应用拒绝
+  （`profile "desktop" is managed exclusively by the Electron application`），
+  因此组合结果以 profile `package.json` 与安装目录为准。
+
 ## 未验证 / 限制
 
-- **尚未安装到 desktop profile**：需要用户确认后安装并重启应用；当前桌面端仍由
-  `~/.dsh/cordis.patch.yml` 里两段绝对路径挂载（工具 + 旧规范化器）。
+- **重启后的 desktop 行为待观察**：bundle 的运行时加载已在隔离 `web` profile
+  验证（`loaded (settleMs=10000)`），desktop 重启后的工具注册与标题改写需要在
+  下次启动时确认。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
   的渲染未在桌面端实际查看。
 - **类型推断是关键词启发式**：与人工判断约七成一致，偏了用 `set_session_title`
@@ -138,16 +162,19 @@ profile。
 - **自动规范化不处理分叉会话**：`header.parentSession` 存在即跳过；分叉前缀由工具
   在改名时补。
 - **未做模型调用/网络验证**：本插件按设计不发起网络请求，也不调用 LLM。
+- **观察到一次边缘案例**：自带标题 provider 曾输出形如
+  `1020｜开发｜…` 的标题；`开发` 不在类型词表内，规范化器不认为它已合规，改写后
+  目标文本仍残留 `1020 开发`。本次已用 `set_session_title` 人工修正；后续如需彻底
+  处理，可把前缀剥离规则放宽为任意 `MMDD｜短类型｜`。
 
-## 迁移到 Bundle 时的注意事项
+## 迁移到 Bundle 时的注意事项（已执行）
 
-桌面端当前是开发期挂载（`~/.dsh/cordis.patch.yml` 两段 insert，指向
+桌面端原先使用开发期挂载（`~/.dsh/cordis.patch.yml` 两段 insert，指向
 `~/.dsh/plugins/session-naming/`）。安装 Bundle 前必须先删除这两段，否则：
 
 - 同一个包会从两个 Loader 来源解析；
 - `set_session_title` 与 `rename_session` 会被注册两次；
 - 规范化器可能对同一标题追加两次修订。
 
-建议顺序：安装 Bundle → 删除 home patch 两段 → 重启应用。安装后可用
-`dsh --profile desktop --dump-config`（若可用）或设置页确认只有一行
-`session-naming`。
+本次已按「安装 Bundle → 删除 home patch 两段 → 重启应用」执行，当前处于等待重启
+的状态。旧文件 `~/.dsh/plugins/session-naming/` 未删除，可作为回滚备份。
