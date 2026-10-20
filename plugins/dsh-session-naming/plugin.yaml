@@ -1,6 +1,6 @@
 id: dsh-session-naming
 name: Session Naming
-version: "0.1.1"
+version: "0.2.0"
 spec_version: "1.0"
 status: experimental
 maintainers:
@@ -12,9 +12,12 @@ description: |
   `rename_session` tools, then watches `session/title` and rewrites the
   built-in summary into `[Branch｜]MMDD｜类型｜目标` after the title settles.
   Provider-sourced revisions keep the title unpinned, so an agent can still
-  correct the inferred type or goal; human titles, compliant titles, subagent
-  and fork sessions are left untouched. Titles come from the session's creation
-  date and the service's 80-byte budget; no model call is added.
+  correct the inferred type or goal; human titles, compliant titles, and
+  subagent sessions are left untouched. A fork child that still carries the
+  inherited `父标题 (n)` is rewritten to `Branch｜MMDD｜类型｜目标` with the
+  ordinal removed, while a human rename on the fork is preserved. Titles come
+  from the session's creation date and the service's 80-byte budget; no model
+  call is added.
 tags: [dsh, deepseek-harness, plugin, session, naming, title, tools]
 license: MIT
 entrypoint: "lib/index.js"

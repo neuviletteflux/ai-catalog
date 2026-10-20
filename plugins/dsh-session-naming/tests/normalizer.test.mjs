@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test, { after } from 'node:test'
@@ -18,11 +18,15 @@ after(async () => {
 
 const createdAt = new Date(2026, 0, 5, 9, 0, 0).getTime()
 
-function fakeSession({ id = 'session-x', createdAt: stamp = createdAt, parentSession, events = [] } = {}) {
+function fakeSession({
+  id = 'session-x', createdAt: stamp = createdAt, parentSession, origin,
+  isSeeded = false, inheritedEventCount = 0, events = [],
+} = {}) {
   const appends = []
   const session = {
     id,
-    header: { createdAt: stamp, parentSession },
+    header: { createdAt: stamp, parentSession, origin, isSeeded },
+    inheritedEventCount,
     snapshotEvents: () => events,
     append: (type, data) => {
       appends.push({ type, data })
@@ -30,6 +34,12 @@ function fakeSession({ id = 'session-x', createdAt: stamp = createdAt, parentSes
     },
   }
   return { session, appends }
+}
+
+async function writeProjection(id, record) {
+  const dir = join(home, 'storages', 'session_projcache', 'sessions')
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, `${id}.json`), JSON.stringify({ record }))
 }
 
 function fakeService(current, { maxTitleBytes = 80 } = {}) {
@@ -278,6 +288,115 @@ test('normalizeNow honours the service byte budget', () => {
   assert.equal(appends.length, 1)
 })
 
+test('normalizeNow rewrites an inherited fork title with Branch and strips (n)', () => {
+  const { session, appends } = fakeSession({
+    parentSession: 'fork-parent',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '父任务' }] } },
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  const ctx = {
+    sessionTitle: fakeService({ title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }
+  const title = normalizeNow(ctx, session, { log: () => {} })
+  assert.equal(title, 'Branch｜0105｜分析｜父标题')
+  assert.equal(appends.length, 1)
+  assert.deepEqual(appends[0].data.messageSeqs, [9])
+  assert.deepEqual(appends[0].data.source, { kind: 'provider', provider: PROVIDER_ID })
+})
+
+test('normalizeNow keeps the type of a convention-shaped fork title', async () => {
+  await writeProjection('fork-parent-conv', { rows: { title: { val: '0105｜查询｜主题' } } })
+  const { session, appends } = fakeSession({
+    parentSession: 'fork-parent-conv',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '主题' }] } },
+      { type: 'session/title', seq: 20, data: { title: '0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  const ctx = {
+    sessionTitle: fakeService({ title: '0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }
+  assert.equal(normalizeNow(ctx, session, { log: () => {} }), 'Branch｜0105｜查询｜主题')
+  assert.deepEqual(appends[0].data.messageSeqs, [9])
+})
+
+test('normalizeNow preserves a human-renamed fork title', () => {
+  const { session, appends } = fakeSession({
+    parentSession: 'fork-human',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '父任务' }] } },
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+      { type: 'session/title', seq: 30, data: { title: '我的分支', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  const ctx = {
+    sessionTitle: fakeService({ title: '我的分支', source: { kind: 'user' }, messageSeqs: [] }),
+  }
+  assert.equal(normalizeNow(ctx, session, { log: () => {} }), undefined)
+  assert.equal(appends.length, 0)
+})
+
+test('normalizeNow skips subagent forks and forks without human refs', () => {
+  const subagent = fakeSession({
+    parentSession: 'fork-sub',
+    origin: 'subagent',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '任务' }] } },
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  assert.equal(normalizeNow({
+    sessionTitle: fakeService({ title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }, subagent.session, { log: () => {} }), undefined)
+  assert.equal(subagent.appends.length, 0)
+
+  const noRefs = fakeSession({
+    parentSession: 'fork-empty',
+    isSeeded: true,
+    events: [
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  assert.equal(normalizeNow({
+    sessionTitle: fakeService({ title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }, noRefs.session, { log: () => {} }), undefined)
+  assert.equal(noRefs.appends.length, 0)
+})
+
+test('normalizeNow skips a compliant fork title but strips a stale (n)', () => {
+  const compliant = fakeSession({
+    parentSession: 'fork-compliant',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '主题' }] } },
+      { type: 'session/title', seq: 20, data: { title: 'Branch｜0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  assert.equal(normalizeNow({
+    sessionTitle: fakeService({ title: 'Branch｜0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] }),
+  }, compliant.session, { log: () => {} }), undefined)
+  assert.equal(compliant.appends.length, 0)
+
+  const stale = fakeSession({
+    parentSession: 'fork-stale',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '主题' }] } },
+      { type: 'session/title', seq: 20, data: { title: 'Branch｜0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  assert.equal(normalizeNow({
+    sessionTitle: fakeService({ title: 'Branch｜0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }, stale.session, { log: () => {} }), 'Branch｜0105｜查询｜主题')
+  assert.deepEqual(stale.appends[0].data.messageSeqs, [9])
+})
+
 test('applyNormalizer rewrites after the settle window and ignores human titles', async () => {
   const { session, appends } = fakeSession({ id: 'session-settle' })
   const state = { current: { title: '主题', source: { kind: 'fallback' }, messageSeqs: [5] } }
@@ -318,6 +437,68 @@ test('applyNormalizer rewrites after the settle window and ignores human titles'
   for (const item of effectDisposers) {
     assert.equal(typeof item, 'function')
   }
+})
+
+test('applyNormalizer schedules an inherited fork title for a user event', async () => {
+  const { session, appends } = fakeSession({
+    id: 'session-fork-settle',
+    parentSession: 'fork-settle',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '父任务' }] } },
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  const state = { current: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } }
+  let listener
+  const ctx = {
+    sessionTitle: { config: { maxTitleBytes: 80 }, get: () => state.current },
+    on: (_name, fn) => { listener = fn; return () => {} },
+    effect: () => {},
+    logger: { warn: () => {} },
+  }
+  const originalAppend = session.append
+  session.append = (type, data) => {
+    originalAppend(type, data)
+    state.current = { ...data }
+  }
+  const dispose = applyNormalizer(ctx, { settleMs: 0 })
+  listener(session, { type: 'session/title', data: { source: { kind: 'user' } } })
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  assert.equal(appends.length, 1)
+  assert.equal(state.current.title, 'Branch｜0105｜分析｜父标题')
+  dispose()
+})
+
+test('applyNormalizer normalizes an inherited fork title without the full settle window', async () => {
+  const { session, appends } = fakeSession({
+    id: 'session-fork-fast',
+    parentSession: 'fork-fast',
+    isSeeded: true,
+    events: [
+      { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '父任务' }] } },
+      { type: 'session/title', seq: 20, data: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+    ],
+  })
+  const state = { current: { title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] } }
+  let listener
+  const ctx = {
+    sessionTitle: { config: { maxTitleBytes: 80 }, get: () => state.current },
+    on: (_name, fn) => { listener = fn; return () => {} },
+    effect: () => {},
+    logger: { warn: () => {} },
+  }
+  const originalAppend = session.append
+  session.append = (type, data) => {
+    originalAppend(type, data)
+    state.current = { ...data }
+  }
+  const dispose = applyNormalizer(ctx, { settleMs: 1000 })
+  listener(session, { type: 'session/title', data: { source: { kind: 'user' } } })
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(appends.length, 1)
+  assert.equal(state.current.title, 'Branch｜0105｜分析｜父标题')
+  dispose()
 })
 
 test('applyNormalizer clears a pending timer on dispose', async () => {

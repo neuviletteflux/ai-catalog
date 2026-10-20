@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.0 — 2026-10-20
+
+- Fork children that still carry the inherited `父标题 (n)` are normalized
+  automatically to `Branch｜MMDD｜类型｜目标`, with the ordinal removed.
+- Human renames on a fork, subagents (`header.origin = "subagent"`), and forks
+  without a human message seq are left untouched.
+- Provider revisions for inherited titles cite the first human message in the
+  inherited log (the inherited title itself has empty `messageSeqs`), satisfying
+  DSH's invariant.
+- Inherited fork titles normalize immediately (0ms) instead of waiting for
+  `settleMs`, so a cold fork can be fixed before disposal.
+- Extracted shared fork detection into `lib/branch.js`; 61 tests.
+
 ## 0.1.1 — 2026-10-20
 
 - Type inference is now weighted: the title dominates the first human message,

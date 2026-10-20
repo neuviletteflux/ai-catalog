@@ -14,7 +14,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.1.1` |
+| Version | `0.2.0` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -167,14 +167,21 @@ any `MMDD｜短类型｜` prefix, including types outside the vocabulary.
 
 The normalizer leaves these alone:
 
-- `source.kind = "user"` (human rename or GUI fork inheritance);
-- titles that already match the convention;
-- sessions with `header.parentSession` (subagents and forks);
-- titles with no human `messageSeqs` (nothing safe to cite);
+- human titles (`source.kind = "user"` on a non-fork, or a fork title that is no
+  longer the inherited `父标题 (n)`);
+- subagent sessions (`header.origin = "subagent"`);
+- titles that already match the convention (for a fork: `Branch｜…` and no
+  trailing `(n)`);
+- forks with no human message seq to cite;
 - its own revisions (prevents self-triggering).
 
-The revision reuses the replaced event's `messageSeqs`, satisfying DSH's
-invariant: `messageSeqs` is empty **iff** `source.kind === "user"`.
+Fork behavior: the inherited title is rewritten to `Branch｜MMDD｜类型｜目标`
+and the trailing `(n)` is removed. A fork's inherited title is stable already,
+so it is normalized without waiting for the normal `settleMs` window. The
+revision reuses the replaced event's `messageSeqs` when present; for an
+inherited fork title (empty refs) it cites the first human message in the
+inherited log. DSH's invariant still holds: `messageSeqs` is empty **iff**
+`source.kind === "user"`.
 
 ### Run log
 
@@ -242,7 +249,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 54 node:test cases
+npm test                      # 61 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py
@@ -252,6 +259,7 @@ Layout:
 
 ```text
 lib/compose.js         title composition, vocabulary, byte budget (pure)
+lib/branch.js          fork detection and inherited-title checks (read-only)
 lib/normalizer.js      title rewrite, type inference, settle listener
 lib/title-tools.js     set_session_title / rename_session definitions
 lib/index.js           config validation and plugin assembly

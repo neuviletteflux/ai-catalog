@@ -33,9 +33,10 @@ plugins/dsh-session-naming/
 ├── cordis.patch.yml      # insert: session-naming（含默认 config）
 ├── lib/compose.js        # 标题拼装、词表、字节预算（纯函数）
 ├── lib/normalizer.js     # 自动规范化、类型推断、稳定窗口监听
+├── lib/branch.js         # fork 判定、继承标题识别（只读）
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 54 项 node:test
+├── tests/                # 61 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -51,13 +52,14 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**54 项通过，0 失败**。覆盖：
+结果：**61 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
 - `normalizer.js`：规范标题识别、类型加权打分、纯疑问句/失败疑问句、码点安全截断、任意类型前缀剥离、
   分支拼装、字节预算、首条人类消息提取、`settleMs` 校验、各类跳过条件、追加事件
   形状、稳定窗口重置、dispose 清理定时器；
+- `branch.js`：fork 判定、父标题匹配、首条空 `messageSeqs` 标题事件、subagent 排除；
 - `title-tools.js`：工具注册/注销、人工标题 guard、`force`、分叉继承放行、
   分支判定（`isSeeded` / `inheritedEventCount` / `origin: subagent` / 投影缓存）、普通/分支/`raw`/`AUTO`
   标题、截断报告、预算报错、网关调用参数、缺失网关与空参数错误；
@@ -72,6 +74,18 @@ npm test
 - `isBranchSession` / `isInheritedForkTitle` 用 `header.origin === "subagent"` 排除
   子代理，避免给 subagent 加 `Branch｜`。
 - 新增回归：8 条误判样例、未知类型前缀、subagent 分支；测试 51 → 54。
+
+### P1a 分叉自动规范化（0.2.0）
+
+- fork 子会话仍带着继承的 `父标题 (n)` 时，自动改写成
+  `Branch｜MMDD｜类型｜目标`，并去掉末尾 `(n)`。
+- 仅当 `isInheritedForkTitle` 为真时改写；fork 上的人工改名、`origin: subagent`、
+  没有人类消息 seq 的 fork 一律跳过。
+- 继承标题的 `messageSeqs` 为空，provider 修订改为引用继承日志里的第一条人类消息
+  seq，满足 DSH 的不变式。
+- fork 的继承标题不等待 `settleMs`，用 0ms 快速路径，避免冷 fork 在定时器触发前
+  被回收。
+- 抽出 `lib/branch.js` 供工具与规范化器共用；测试 54 → 61。
 
 ### 元数据校验
 
@@ -178,13 +192,11 @@ profile。
   的渲染未在桌面端实际查看。
 - **类型推断是加权启发式**：标题权重高于首条消息，但仍读不懂真实意图；偏了用
   `set_session_title` 修正。P0 只改判定，不回溯改写已有标题。
-- **自动规范化不处理分叉会话**：`header.parentSession` 存在即跳过；分叉前缀由工具
-  在改名时补。
+- **分叉自动规范化只处理继承标题**：fork 上的人工改名、没有人类消息 seq 的 fork、
+  以及定时器触发前已被回收的冷 fork 可能保持原样；这些情况由工具或后续 backfill 处理。
 - **未做模型调用/网络验证**：本插件按设计不发起网络请求，也不调用 LLM。
-- **观察到一次边缘案例**：自带标题 provider 曾输出形如
-  `1020｜开发｜…` 的标题；`开发` 不在类型词表内，规范化器不认为它已合规，改写后
-  目标文本仍残留 `1020 开发`。本次已用 `set_session_title` 人工修正；后续如需彻底
-  处理，可把前缀剥离规则放宽为任意 `MMDD｜短类型｜`。
+- **旧的无效类型前缀案例已修复**：0.1.1 起前缀剥离覆盖词表外类型，不再残留
+  `1020 开发`；历史标题本身不会回溯改写。
 
 ## 迁移到 Bundle 时的注意事项（已执行）
 

@@ -13,7 +13,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.1.1` |
+| 版本 | `0.2.0` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -156,13 +156,17 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 
 以下情况一律不碰：
 
-- `source.kind = "user"`（人工命名，或 GUI 分叉写入的继承标题）；
-- 已符合规范的标题；
-- `header.parentSession` 存在的会话（子代理与分叉）；
-- 没有可引用人类消息 `messageSeqs` 的标题；
+- 人工标题（非分叉的 `source.kind = "user"`，或已不再等于继承的 `父标题 (n)`
+  的分叉标题）；
+- 子代理会话（`header.origin = "subagent"`）；
+- 已符合规范的标题（分叉要求带 `Branch｜` 且没有末尾 `(n)`）；
+- 没有可引用人类消息 seq 的分叉；
 - 自己写的修订（防自触发）。
 
-修订沿用被替换事件的 `messageSeqs`，满足 DSH 的不变式：
+分叉行为：继承标题会改写成 `Branch｜MMDD｜类型｜目标`，并去掉末尾 `(n)`。
+分叉的继承标题本身已经稳定，因此不等待常规 `settleMs` 窗口，而是快速规范化。
+修订优先沿用被替换事件的 `messageSeqs`；继承标题的 `messageSeqs` 为空时，引用
+继承日志里的第一条人类消息。DSH 的不变式仍然成立：
 `messageSeqs` 为空**当且仅当** `source.kind === "user"`。
 
 ### 运行日志
@@ -223,7 +227,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 54 项 node:test
+npm test                      # 61 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py
@@ -233,6 +237,7 @@ python3 scripts/validate_metadata.py
 
 ```text
 lib/compose.js         标题拼装、词表、字节预算（纯函数）
+lib/branch.js          fork 判定与继承标题识别（只读）
 lib/normalizer.js      标题改写、类型推断、稳定窗口监听
 lib/title-tools.js     set_session_title / rename_session 定义
 lib/index.js           配置校验与插件组装

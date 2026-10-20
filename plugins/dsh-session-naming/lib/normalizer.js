@@ -16,8 +16,9 @@ import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
-  DEFAULT_MAX_TITLE_BYTES, SEPARATOR, TYPES, monthDayOf, oneLine, utf8Bytes,
+  DEFAULT_MAX_TITLE_BYTES, SEPARATOR, TYPES, hasBranchPrefix, monthDayOf, oneLine, utf8Bytes,
 } from './compose.js'
+import { forkTitleBase, isBranchSession, isInheritedForkTitle } from './branch.js'
 
 /** Source id used on revision events; also prevents self-triggering. */
 export const PROVIDER_ID = 'session-naming-convention'
@@ -256,6 +257,38 @@ export function firstHumanText(session) {
   return ''
 }
 
+/** Seq of the first human `user/message` event, for invariant-safe refs. */
+export function firstHumanSeq(session) {
+  try {
+    const events = typeof session?.snapshotEvents === 'function' ? session.snapshotEvents() : []
+    for (const event of events) {
+      if (event?.type !== 'user/message') continue
+      if (event.data?.source?.kind !== 'user') continue
+      if (Number.isSafeInteger(event.seq) && event.seq >= 0) return event.seq
+    }
+  } catch {
+    /* unreadable logs cannot supply a ref */
+  }
+  return undefined
+}
+
+/**
+ * Message refs for a provider revision.
+ *
+ * A fork's inherited title is a user title with an empty `messageSeqs`, but a
+ * provider revision must cite at least one earlier human message. Fall back to
+ * the first human message in the inherited log; return an empty list when the
+ * fork has none, so the caller skips instead of violating the invariant.
+ */
+export function titleRefs(session, current) {
+  const refs = Array.isArray(current?.messageSeqs)
+    ? [...new Set(current.messageSeqs.filter((seq) => Number.isSafeInteger(seq) && seq >= 0))]
+    : []
+  if (refs.length > 0) return refs
+  const seq = firstHumanSeq(session)
+  return seq === undefined ? [] : [seq]
+}
+
 /** Validate the settle window. */
 export function settleDelayOf(config) {
   const value = config?.settleMs
@@ -264,6 +297,12 @@ export function settleDelayOf(config) {
     throw new Error('session-naming-normalizer: settleMs 必须是 0-600000 的整数')
   }
   return value
+}
+
+/** A fork title is compliant only with a Branch prefix and no trailing `(n)`. */
+function isForkTitleCompliant(title) {
+  const text = oneLine(title)
+  return isConventionTitle(text) && hasBranchPrefix(text) && forkTitleBase(text) === text
 }
 
 /**
@@ -280,29 +319,41 @@ export function normalizeNow(ctx, session, options = {}) {
   if (service === undefined) return undefined
   const current = service.get(session)
   if (current === undefined) return undefined
-  if (current.source?.kind === 'user') return undefined
   if (current.source?.kind === 'provider' && current.source.provider === providerId) return undefined
-  if (isConventionTitle(current.title)) return undefined
   const header = session?.header ?? {}
-  if (header.parentSession !== undefined) return undefined
-  const refs = Array.isArray(current.messageSeqs)
-    ? current.messageSeqs.filter((seq) => Number.isSafeInteger(seq))
-    : []
+  if (header.origin === 'subagent') return undefined
+
+  const fork = isBranchSession(session)
+  if (fork) {
+    // Only the system-written inherited title may be replaced; a human rename on
+    // the fork must survive, and a title that already carries Branch｜ is done.
+    if (!isInheritedForkTitle(session, current)) return undefined
+    if (isForkTitleCompliant(current.title)) return undefined
+  } else {
+    if (current.source?.kind === 'user') return undefined
+    if (isConventionTitle(current.title)) return undefined
+    // Preserve the old rule for non-fork sessions with a parent (subagents whose
+    // origin marker is missing must never be normalized).
+    if (header.parentSession !== undefined) return undefined
+  }
+
+  const refs = titleRefs(session, current)
   if (refs.length === 0) return undefined
   const maxBytes = Number.isInteger(service.config?.maxTitleBytes)
     ? service.config.maxTitleBytes
     : DEFAULT_MAX_TITLE_BYTES
+  const goal = fork ? forkTitleBase(current.title) : current.title
   const title = composeNormalized({
-    goal: current.title,
-    type: pickType(current.title, firstHumanText(session)),
+    goal,
+    type: pickType(goal, firstHumanText(session)),
     createdAt: header.createdAt,
     maxBytes,
-    branch: false,
+    branch: fork,
   })
-  if (title === current.title) return undefined
+  if (title === oneLine(current.title)) return undefined
   session.append('session/title', {
     title,
-    messageSeqs: [...refs],
+    messageSeqs: refs,
     source: { kind: 'provider', provider: providerId },
   })
   const log = options.log ?? logLine
@@ -320,7 +371,7 @@ export function applyNormalizer(ctx, config) {
   const settleMs = settleDelayOf(config)
   const timers = new Map()
 
-  const settleLater = (session) => {
+  const settleLater = (session, delay = settleMs) => {
     const id = session?.id
     if (typeof id !== 'string') return
     const existing = timers.get(id)
@@ -334,7 +385,7 @@ export function applyNormalizer(ctx, config) {
           ctx.logger.warn(`session-naming-normalizer: 规范化会话 "${id}" 失败: ${String(error)}`)
         }
       }
-    }, settleMs)
+    }, delay)
     // Do not hold a headless process open just to wait for a title.
     if (typeof timer.unref === 'function') timer.unref()
     timers.set(id, timer)
@@ -343,8 +394,14 @@ export function applyNormalizer(ctx, config) {
   const off = ctx.on('session/event', (session, event) => {
     if (event?.type !== 'session/title') return
     const source = event.data?.source
-    if (source?.kind === 'user') return
     if (source?.kind === 'provider' && source.provider === PROVIDER_ID) return
+    if (source?.kind === 'user') {
+      if (!isBranchSession(session)) return
+      // A fork's inherited title is stable already: do not wait for the LLM
+      // summary window, and normalize before a cold fork can be disposed.
+      settleLater(session, 0)
+      return
+    }
     settleLater(session)
   })
 

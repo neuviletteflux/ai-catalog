@@ -119,22 +119,28 @@ test('isInheritedForkTitle accepts a title that matches the parent plus an index
 test('isInheritedForkTitle accepts the first empty title event as inheritance evidence', () => {
   const session = makeSession({
     parentSession: 'parent-missing',
-    events: [{ type: 'session/title', data: { title: '继承标题', messageSeqs: [] } }],
+    events: [{ type: 'session/title', data: { title: '继承标题 (1)', messageSeqs: [] } }],
   })
-  assert.equal(isInheritedForkTitle(session, { title: '继承标题' }), true)
+  assert.equal(isInheritedForkTitle(session, { title: '继承标题 (1)' }), true)
 
   const later = makeSession({
     parentSession: 'parent-missing',
-    events: [{ type: 'session/title', data: { title: '继承标题', messageSeqs: [1] } }],
+    events: [{ type: 'session/title', data: { title: '继承标题 (1)', messageSeqs: [1] } }],
   })
-  assert.equal(isInheritedForkTitle(later, { title: '继承标题' }), false)
+  assert.equal(isInheritedForkTitle(later, { title: '继承标题 (1)' }), false)
 
   const subagent = makeSession({
     parentSession: 'parent-missing',
     origin: 'subagent',
-    events: [{ type: 'session/title', data: { title: '继承标题', messageSeqs: [] } }],
+    events: [{ type: 'session/title', data: { title: '继承标题 (1)', messageSeqs: [] } }],
   })
-  assert.equal(isInheritedForkTitle(subagent, { title: '继承标题' }), false)
+  assert.equal(isInheritedForkTitle(subagent, { title: '继承标题 (1)' }), false)
+
+  const human = makeSession({
+    parentSession: 'parent-missing',
+    events: [{ type: 'session/title', data: { title: '我的分支', messageSeqs: [] } }],
+  })
+  assert.equal(isInheritedForkTitle(human, { title: '我的分支' }), false)
 })
 
 test('branch detection uses storage flags and the projection cache', async () => {
