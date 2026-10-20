@@ -14,7 +14,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.4.2` |
+| 版本 | `0.4.3` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -242,7 +242,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 72 项 node:test
+npm test                      # 73 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py

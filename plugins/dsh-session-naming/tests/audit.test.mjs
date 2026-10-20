@@ -105,6 +105,24 @@ test('auditEntries treats a parent and its fork as a pair, not a duplicate', () 
   assert.equal(result.forkPairs[0].count, 2)
 })
 
+test('audit output schema uses only boolean additionalProperties', () => {
+  const schema = sessionTitleAuditTool().output.schema
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(walk)
+      return
+    }
+    if (node === null || typeof node !== 'object') return
+    if (Object.hasOwn(node, 'additionalProperties')) {
+      assert.equal(typeof node.additionalProperties, 'boolean')
+    }
+    for (const value of Object.values(node)) walk(value)
+  }
+  walk(schema)
+  assert.equal(schema.properties.typeCounts.additionalProperties, false)
+  assert.equal(schema.properties.typeCounts.properties.AUTO.type, 'integer')
+})
+
 test('session_title_audit is read-only and validates its limit', async () => {
   const tool = sessionTitleAuditTool()
   assert.equal(tool.name, 'session_title_audit')

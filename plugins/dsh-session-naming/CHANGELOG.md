@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.3 — 2026-10-20
+
+- Fix the `session_title_audit` output schema: `typeCounts.additionalProperties`
+  must be a boolean for the Host tool schema validator. The object form made
+  `ctx.tools.register` throw `JsonSchemaError`, which aborted the whole host
+  plugin (no tools, no normalizer) on 0.4.2.
+- Add a regression test that walks the audit output schema and requires every
+  `additionalProperties` to be boolean. Tests 72 → 73.
+
 ## 0.4.2 — 2026-10-20
 
 - Declare `@deepseek-ai/dsh-client-ui-renderer` in the client inject list, the

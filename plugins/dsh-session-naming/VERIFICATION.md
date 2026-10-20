@@ -38,7 +38,7 @@ plugins/dsh-session-naming/
 ├── lib/client.js         # 浏览器半侧：Session 行分叉图标
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 72 项 node:test
+├── tests/                # 73 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -54,7 +54,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**72 项通过，0 失败**。覆盖：
+结果：**73 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；

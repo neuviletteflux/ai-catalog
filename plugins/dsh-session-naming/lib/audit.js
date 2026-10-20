@@ -250,7 +250,9 @@ export function sessionTitleAuditTool() {
           forkPairGroups: { type: 'integer' },
           typeCounts: {
             type: 'object',
-            additionalProperties: { type: 'integer' },
+            additionalProperties: false,
+            required: [...TYPES],
+            properties: Object.fromEntries(TYPES.map((type) => [type, { type: 'integer' }])),
           },
           duplicates: {
             type: 'array',

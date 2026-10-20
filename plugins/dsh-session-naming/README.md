@@ -15,7 +15,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.4.2` |
+| Version | `0.4.3` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -269,7 +269,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 72 node:test cases
+npm test                      # 73 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py
