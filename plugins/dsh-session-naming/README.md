@@ -14,7 +14,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.1.0` |
+| Version | `0.1.1` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |

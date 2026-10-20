@@ -139,9 +139,10 @@ profile。
 
 ## desktop profile 安装与清理记录（2026-10-20）
 
-- 提交 `d818e7d`（插件包）与 `e4b893a`（安装验证）已推送到 `origin/main`。
-- 首次从 GitHub 安装后，按要求卸载并清理旧插件，再从 GitHub 重新安装；锁文件解析
-  到 `e4b893a`：
+- 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）已推送到
+  `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1 发布后再次
+  `remove` → `add`，锁文件解析到 `507a21c`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -151,16 +152,20 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.1.0`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `e4b893a`。
+  结果：`+ dsh-session-naming 0.1.1`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `507a21c`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
   `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
   的 patch 备份。
-- 重新安装后运行中的 App 已热加载新 bundle：`~/.dsh/logs/session-naming.log` 新增
-  `2026-10-20T02:21:05.069Z loaded (settleMs=10000)`。因此本次不需要等待重启；重启
-  仍然安全。
+- 重新安装后运行中的 App 已热加载 0.1.1：`~/.dsh/logs/session-naming.log` 新增
+  `2026-10-20T02:46:40.015Z loaded (settleMs=10000)`；0.1.0 的热加载记录是
+  `2026-10-20T02:21:05.069Z loaded (settleMs=10000)`。两次都不需要等待重启；
+  重启仍然安全。
+- 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
+  `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题），
+  证明新工具已接管。
 - `dsh --profile desktop --dump-config` 被应用拒绝
   （`profile "desktop" is managed exclusively by the Electron application`），
   因此组合结果以 profile `package.json` 与安装目录为准。
@@ -171,8 +176,8 @@ profile。
   重启后的工具注册与标题改写属于同一代码路径，但冷启动本身未单独记录。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
   的渲染未在桌面端实际查看。
-- **类型推断是关键词启发式**：与人工判断约七成一致，偏了用 `set_session_title`
-  修正。
+- **类型推断是加权启发式**：标题权重高于首条消息，但仍读不懂真实意图；偏了用
+  `set_session_title` 修正。P0 只改判定，不回溯改写已有标题。
 - **自动规范化不处理分叉会话**：`header.parentSession` 存在即跳过；分叉前缀由工具
   在改名时补。
 - **未做模型调用/网络验证**：本插件按设计不发起网络请求，也不调用 LLM。
