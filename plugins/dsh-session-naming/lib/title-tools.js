@@ -20,7 +20,7 @@ import {
   composeTitle, ensureBranchPrefix, hasBranchPrefix, oneLine, utf8Bytes,
   DEFAULT_MAX_TITLE_BYTES, TYPES,
 } from './compose.js'
-import { branchFromProjectionCache, isBranchSession, isInheritedForkTitle } from './branch.js'
+import { branchFromProjectionCache, forkTitleBase, isBranchSession, isInheritedForkTitle } from './branch.js'
 
 export { branchFromProjectionCache, isBranchSession, isInheritedForkTitle }
 
@@ -167,11 +167,13 @@ export function renameSessionTool(ctx) {
         throw new Error('session-naming: rename_session 需要 sessionController 服务，当前部署未挂载')
       }
       const detected = typeof args.branch === 'boolean' ? args.branch : branchFromProjectionCache(args.sessionId)
-      const title = ensureBranchPrefix(input, detected === true)
+      const base = detected === true ? forkTitleBase(input) : input
+      const title = ensureBranchPrefix(base, detected === true)
       const result = await controller.rename({ sessionId: args.sessionId, title })
       const accepted = result?.title ?? title
       const notes = []
       if (detected === true) notes.push(hasBranchPrefix(input) ? '分支会话（前缀已在标题里）' : '分支会话，已加 Branch｜ 前缀')
+      if (detected === true && base !== input) notes.push('已去掉末尾的 (n)')
       else if (detected === undefined) notes.push('未能判定是否分支，未加前缀（可用 branch 参数指定）')
       if (accepted !== title) notes.push(`超过字节上限，已截断为 ${utf8Bytes(accepted)} 字节`)
       return {

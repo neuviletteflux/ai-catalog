@@ -1,6 +1,6 @@
 id: dsh-session-naming
 name: Session Naming
-version: "0.2.1"
+version: "0.2.2"
 spec_version: "1.0"
 status: experimental
 maintainers:

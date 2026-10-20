@@ -262,6 +262,18 @@ test('rename_session uses the session controller and derives the branch prefix f
   })
 })
 
+test('rename_session strips a trailing (n) from a fork title', async () => {
+  await writeProjection('session-fork-n', { identity: { isSeeded: true } })
+  const controller = { rename: async (request) => ({ title: request.title }) }
+  const tool = renameSessionTool(makeCtx(makeService(), { controller }))
+  const result = await tool.execute({
+    sessionId: 'session-fork-n',
+    title: '1016｜规划｜重构控制台页面方案 (1)',
+  })
+  assert.equal(result.title, 'Branch｜1016｜规划｜重构控制台页面方案')
+  assert.match(result.message, /已去掉末尾的 \(n\)/u)
+})
+
 test('rename_session lets an explicit branch flag override the cache', async () => {
   await writeProjection('session-plain', { identity: { isSeeded: true } })
   const controller = { rename: async (request) => ({ title: request.title }) }

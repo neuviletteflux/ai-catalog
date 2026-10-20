@@ -36,7 +36,7 @@ plugins/dsh-session-naming/
 ├── lib/branch.js         # fork 判定、继承标题识别（只读）
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 61 项 node:test
+├── tests/                # 62 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -52,7 +52,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**61 项通过，0 失败**。覆盖：
+结果：**62 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
@@ -75,7 +75,7 @@ npm test
   子代理，避免给 subagent 加 `Branch｜`。
 - 新增回归：8 条误判样例、未知类型前缀、subagent 分支；测试 51 → 54。
 
-### P1a 分叉自动规范化（0.2.0）
+### P1a 分叉自动规范化（0.2.0 / 0.2.1）
 
 - fork 子会话仍带着继承的 `父标题 (n)` 时，自动改写成
   `Branch｜MMDD｜类型｜目标`，并去掉末尾 `(n)`。
@@ -85,7 +85,16 @@ npm test
   seq，满足 DSH 的不变式。
 - fork 的继承标题不等待 `settleMs`，用 0ms 快速路径，避免冷 fork 在定时器触发前
   被回收。
-- 抽出 `lib/branch.js` 供工具与规范化器共用；测试 54 → 61。
+- 抽出 `lib/branch.js` 供工具与规范化器共用；测试 54 → 62。
+- 0.2.2 起 `rename_session` 对 fork 先去掉末尾 `(n)` 再加 `Branch｜`。
+- 0.2.1 修复 `rename_session`：直接调用 Host 的
+  `sessionController.rename({ sessionId, title })`；旧的 `typertGateway.invoke`
+  请求缺少 Peer 上下文，live 调用会报 `reading 'signal'`。
+- live 验证：把旧 fork `session-596df7d1…` 的标题设为
+  `1016｜规划｜重构控制台页面方案 (1)` 后，规范化器日志记录
+  `03:02:49.356Z … (user) → "Branch｜1016｜规划｜重构控制台页面方案"`；会话日志
+  seq 1841 的 provider 修订带 `messageSeqs: [8]`，投影缓存同步为
+  `Branch｜1016｜规划｜重构控制台页面方案`。
 
 ### 元数据校验
 
@@ -105,7 +114,7 @@ cd plugins/dsh-session-naming
 npm pack --dry-run
 ```
 
-结果：14 个文件、19.6 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
+结果：15 个文件、23.7 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
 `assets/icon.svg`、两份 README、`CHANGELOG.md`、`LICENSE`、`plugin.yaml`、
 `package.json`；不包含 `tests/`。
 
@@ -153,10 +162,10 @@ profile。
 
 ## desktop profile 安装与清理记录（2026-10-20）
 
-- 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）已推送到
-  `origin/main`。
-- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1 发布后再次
-  `remove` → `add`，锁文件解析到 `507a21c`：
+- 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）、
+  `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）已推送到 `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1、0.2.0、0.2.1
+  发布后分别再次 `remove` → `add`；当前锁文件解析到 `438f8e6`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -166,20 +175,20 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.1.1`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `507a21c`。
+  结果：`+ dsh-session-naming 0.2.1`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `438f8e6`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
   `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
   的 patch 备份。
-- 重新安装后运行中的 App 已热加载 0.1.1：`~/.dsh/logs/session-naming.log` 新增
-  `2026-10-20T02:46:40.015Z loaded (settleMs=10000)`；0.1.0 的热加载记录是
-  `2026-10-20T02:21:05.069Z loaded (settleMs=10000)`。两次都不需要等待重启；
-  重启仍然安全。
+- 重新安装后运行中的 App 连续热加载：0.1.0 `02:21:05.069Z`、0.1.1
+  `02:46:40.015Z`、0.2.0 `03:00:43.615Z`、0.2.1 `03:02:38.479Z`，均为
+  `loaded (settleMs=10000)`。不需要等待重启；重启仍然安全。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
-  `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题），
-  证明新工具已接管。
+  `1020｜实施｜会话命名 P0 类型与分支优化`（53/80 字节，`force` 覆盖旧的人工标题）。
+- 0.2.1 的 `rename_session` 实测成功后，旧 fork `session-596df7d1…` 被自动规范化：
+  `03:02:49.356Z` 的日志与 seq 1841 的 provider 修订（`messageSeqs: [8]`）见上。
 - `dsh --profile desktop --dump-config` 被应用拒绝
   （`profile "desktop" is managed exclusively by the Electron application`），
   因此组合结果以 profile `package.json` 与安装目录为准。

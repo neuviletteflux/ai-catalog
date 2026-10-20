@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2 — 2026-10-20
+
+- `rename_session` now strips a trailing `(n)` before adding `Branch｜` to a
+  fork title, so an inherited title cannot become `Branch｜… (1)`.
+
 ## 0.2.1 — 2026-10-20
 
 - Fix `rename_session`: call the Host `sessionController.rename({ sessionId,
