@@ -35,9 +35,10 @@ plugins/dsh-session-naming/
 ├── lib/normalizer.js     # 自动规范化、类型推断、稳定窗口监听
 ├── lib/audit.js          # 只读标题审计（投影缓存）
 ├── lib/branch.js         # fork 判定、继承标题识别（只读）
+├── lib/client.js         # 浏览器半侧：Session 行分叉图标
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 69 项 node:test
+├── tests/                # 71 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -53,7 +54,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**69 项通过，0 失败**。覆盖：
+结果：**71 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
@@ -65,6 +66,7 @@ npm test
   分支判定（`isSeeded` / `inheritedEventCount` / `origin: subagent` / 投影缓存）、普通/分支/`raw`/`AUTO`
   标题、截断报告、预算报错、网关调用参数、缺失网关与空参数错误；
 - `audit.js`：投影缓存扫描、limit、合规/分支/无效前缀/AUTO 缺序号/重复统计；
+- `client.js`：`isFork` 谓词、行前 seat 注册、locale 字典与组件的显示/隐藏；
 - `index.js`：配置默认值、未知键、类型错误、单半边启用、挂载与 dispose。
 
 ### P0 优化（0.1.1）
@@ -91,6 +93,8 @@ npm test
 - 0.2.2 起 `rename_session` 对 fork 先去掉末尾 `(n)` 再加 `Branch｜`。
 - 0.3.0 新增只读 `session_title_audit`，并收紧 `AUTO`：必须带 `seq`，标题必须
   以 `-NN` 结尾；测试 62 → 69。
+- 0.4.0 新增可选 client 半侧：Session 行前的分叉图标；测试 69 → 71。
+  客户端 bundle 需要重启后加载，本轮无法在当前 App 内做视觉验证。
 - 0.2.1 修复 `rename_session`：直接调用 Host 的
   `sessionController.rename({ sessionId, title })`；旧的 `typertGateway.invoke`
   请求缺少 Peer 上下文，live 调用会报 `reading 'signal'`。
@@ -118,7 +122,7 @@ cd plugins/dsh-session-naming
 npm pack --dry-run
 ```
 
-结果：16 个文件、27.3 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
+结果：17 个文件、29.6 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
 `assets/icon.svg`、两份 README、`CHANGELOG.md`、`LICENSE`、`plugin.yaml`、
 `package.json`；不包含 `tests/`。
 

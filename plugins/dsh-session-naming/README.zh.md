@@ -7,13 +7,14 @@
 | 半边 | 作用 |
 |---|---|
 | Agent 工具 | 新增 `set_session_title`（当前会话）、`rename_session`（按 id 改任意会话），以及只读的 `session_title_audit`。 |
+| 客户端 UI | 可选的 Session 行前分叉图标（client bundle 需要重启后加载）。 |
 | 自动规范化 | 监听 `session/title`，等自带摘要稳定后追加 `[Branch｜]MMDD｜类型｜目标`。 |
 
 社区插件，不是 DeepSeek 官方产品。
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.3.0` |
+| 版本 | `0.4.0` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -145,6 +146,13 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 `Branch｜`、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日同目标
 重复。它不写标题、会话日志或投影缓存。
 
+### 分叉徽标（客户端半侧）
+
+`lib/client.js` 在 `sidebar.session.row.leading` 注册一个紧凑、带 aria 标签的分叉
+图标：仅当行的 `SessionSummary` 带 `parentSessionId` 且不是子代理时显示。它只是
+视觉辅助，持久标记仍是标题里的 `Branch｜` 前缀。客户端入口单独打包，替换已安装
+的包需要重启 App 才会加载新 bundle；客户端加载失败不会影响 Host 工具与规范化器。
+
 
 ### 类型判定
 
@@ -234,7 +242,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 69 项 node:test
+npm test                      # 71 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py
@@ -245,6 +253,7 @@ python3 scripts/validate_metadata.py
 ```text
 lib/compose.js         标题拼装、词表、字节预算（纯函数）
 lib/audit.js           投影缓存上的只读标题审计
+lib/client.js          浏览器半侧：Session 行分叉图标
 lib/branch.js          fork 判定与继承标题识别（只读）
 lib/normalizer.js      标题改写、类型推断、稳定窗口监听
 lib/title-tools.js     set_session_title / rename_session 定义

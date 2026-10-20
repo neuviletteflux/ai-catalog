@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-10-20
+
+- Add an optional client half (`./client`): a compact, aria-labeled fork icon
+  in `sidebar.session.row.leading` for top-level `SessionSummary` rows with a
+  `parentSessionId`; subagents are excluded. The title prefix remains the
+  durable marker.
+- The client bundle requires an app restart after replacing the package; host
+  tools and the normalizer are unaffected by a client load failure.
+- Tests 69 → 71.
+
 ## 0.3.0 — 2026-10-20
 
 - Add the read-only `session_title_audit` tool: compliance rate, type

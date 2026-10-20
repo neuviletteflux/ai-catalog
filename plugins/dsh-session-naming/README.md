@@ -8,13 +8,14 @@ a prompt-only instruction. The plugin has two halves:
 | Half | What it does |
 |---|---|
 | Agent tools | Adds `set_session_title` (current session), `rename_session` (any session by id), and a read-only `session_title_audit`. |
+| Client UI | Optional leading-seat fork icon on Session rows (requires a restart to load the client bundle). |
 | Automatic normalizer | Watches `session/title`, waits for the built-in summary to settle, then appends `[Branch｜]MMDD｜类型｜目标`. |
 
 Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.3.0` |
+| Version | `0.4.0` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -155,6 +156,15 @@ carrying `(n)`, invalid type prefixes, `AUTO` titles without a run index, and
 same-day/same-goal duplicates. It never writes a title, session log, or
 projection cache.
 
+### Fork badge (client half)
+
+`lib/client.js` registers a compact, aria-labeled fork icon in
+`sidebar.session.row.leading` for a row whose `SessionSummary` has a
+`parentSessionId` and is not a subagent. It is a visual aid only: the durable
+marker is still the `Branch｜` title prefix. The client entry is bundled
+separately, so replacing an installed package needs an app restart to load a
+fresh generation; a client failure cannot break the host tools or normalizer.
+
 
 ### Type inference
 
@@ -259,7 +269,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 69 node:test cases
+npm test                      # 71 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py
@@ -270,6 +280,7 @@ Layout:
 ```text
 lib/compose.js         title composition, vocabulary, byte budget (pure)
 lib/audit.js           read-only title audit over the projection cache
+lib/client.js          browser half: fork icon in the Session row
 lib/branch.js          fork detection and inherited-title checks (read-only)
 lib/normalizer.js      title rewrite, type inference, settle listener
 lib/title-tools.js     set_session_title / rename_session definitions
