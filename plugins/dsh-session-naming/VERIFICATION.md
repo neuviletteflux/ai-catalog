@@ -127,34 +127,38 @@ profile：
 `node_modules` 符号链接、从备份恢复 `~/.dsh-alpha/cordis.patch.yml`。未改动 desktop
 profile。
 
-## desktop profile 安装记录（2026-10-20）
+## desktop profile 安装与清理记录（2026-10-20）
 
-- 提交 `d818e7d` 已推送到 `origin/main`。
-- 使用应用自带 CLI 从 GitHub 安装到 desktop：
+- 提交 `d818e7d`（插件包）与 `e4b893a`（安装验证）已推送到 `origin/main`。
+- 首次从 GitHub 安装后，按要求卸载并清理旧插件，再从 GitHub 重新安装；锁文件解析
+  到 `e4b893a`：
 
   ```bash
+  '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
+    plugin --profile desktop remove dsh-session-naming
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
     plugin --profile desktop add \
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
   结果：`+ dsh-session-naming 0.1.0`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均已包含该包，安装目录版本为 `0.1.0`。
-- `~/.dsh/cordis.patch.yml` 中两段旧 insert（`session-naming`、
-  `session-naming-normalizer`）已替换为迁移说明。YAML 解析通过，全文不再有
-  `session-naming` 的挂载值。
-- 运行中的 App 尚未重启：旧插件仍处于已加载状态，因此当前会话工具仍可用；已用
-  `set_session_title` 设置 `1020｜实施｜会话命名打包为 DSH 插件`（48/80 字节）。
-  重启后旧插件不再加载，由 profile bundle 接管。
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `e4b893a`。
+- `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
+  全文 0 处 `session-naming`。
+- 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
+  `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
+  的 patch 备份。
+- 重新安装后运行中的 App 已热加载新 bundle：`~/.dsh/logs/session-naming.log` 新增
+  `2026-10-20T02:21:05.069Z loaded (settleMs=10000)`。因此本次不需要等待重启；重启
+  仍然安全。
 - `dsh --profile desktop --dump-config` 被应用拒绝
   （`profile "desktop" is managed exclusively by the Electron application`），
   因此组合结果以 profile `package.json` 与安装目录为准。
 
 ## 未验证 / 限制
 
-- **重启后的 desktop 行为待观察**：bundle 的运行时加载已在隔离 `web` profile
-  验证（`loaded (settleMs=10000)`），desktop 重启后的工具注册与标题改写需要在
-  下次启动时确认。
+- **desktop 冷启动仍建议观察一次**：热加载已通过 `loaded (settleMs=10000)` 证明；
+  重启后的工具注册与标题改写属于同一代码路径，但冷启动本身未单独记录。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
   的渲染未在桌面端实际查看。
 - **类型推断是关键词启发式**：与人工判断约七成一致，偏了用 `set_session_title`
@@ -176,5 +180,7 @@ profile。
 - `set_session_title` 与 `rename_session` 会被注册两次；
 - 规范化器可能对同一标题追加两次修订。
 
-本次已按「安装 Bundle → 删除 home patch 两段 → 重启应用」执行，当前处于等待重启
-的状态。旧文件 `~/.dsh/plugins/session-naming/` 未删除，可作为回滚备份。
+本次已按「安装 Bundle → 删除 home patch 两段 → 重新安装并确认热加载」执行；旧文件
+归档后删除。若要回滚，解压
+`~/.dsh/backups/session-naming-legacy-20261020.tar.gz`，恢复旧插件目录与 patch，
+移除 profile 里的 `dsh-session-naming`，然后重启。
