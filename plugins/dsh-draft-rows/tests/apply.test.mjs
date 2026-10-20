@@ -51,7 +51,7 @@ function loadBundle() {
 
 const { bundle, sandbox } = loadBundle();
 
-function makeHarness({ drafts = {}, workspaceSessionIds = ["a"], sessionOverrides = {}, current = "a" } = {}) {
+function makeHarness({ drafts = {}, workspaceSessionIds = ["a"], sessionOverrides = {}, current = "a", view = undefined, viewState = undefined } = {}) {
   const creates = [];
   const sessions = {
     create: undefined,
@@ -92,6 +92,7 @@ function makeHarness({ drafts = {}, workspaceSessionIds = ["a"], sessionOverride
     startSession: (...args) => { stockStarts.push(args); },
     openSession: (id) => { opened.push(id); }
   };
+  if (view !== undefined) uiWorkspace.view = view;
 
   const cleanups = [];
   const ctx = {
@@ -115,7 +116,9 @@ function makeHarness({ drafts = {}, workspaceSessionIds = ["a"], sessionOverride
   };
 
   const previousLocalStorage = sandbox.localStorage;
-  sandbox.localStorage = makeLocalStorage(drafts);
+  const entries = { ...drafts };
+  if (viewState !== undefined) entries["dsh.workspace.view.v5"] = JSON.stringify(viewState);
+  sandbox.localStorage = makeLocalStorage(entries);
 
   bundle.apply(ctx);
 
@@ -195,7 +198,7 @@ test("the visible list collapses extra empty drafts to the current one", () => {
   harness.cleanup();
 });
 
-test("typed drafts stay and the single New Session row leads them", async () => {
+test("typed drafts stay while the stock list order is preserved", async () => {
   const harness = makeHarness({
     drafts: { "dsh.conversation.a": JSON.stringify({ draft: { text: "hello" }, references: [] }) },
     workspaceSessionIds: ["a", "b", "c"],
@@ -207,7 +210,7 @@ test("typed drafts stay and the single New Session row leads them", async () => 
     }
   });
   const snapshot = harness.sessions.list.getSnapshot();
-  assert.deepEqual(JSON.parse(JSON.stringify(snapshot.ids)), ["c", "a"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(snapshot.ids)), ["a", "c"], "the stock ids order survives projection");
   assert.equal(snapshot.byId.c.title, "新会话");
   assert.equal(snapshot.byId.a.title, "草稿｜hello");
   assert.equal(snapshot.byId.b, undefined);
@@ -215,5 +218,46 @@ test("typed drafts stay and the single New Session row leads them", async () => 
   harness.uiWorkspace.startSession();
   await tick();
   assert.equal(JSON.stringify(harness.creates), JSON.stringify([{ workspaceId: "w", sessionId: "c" }]), "New Session reuses the visible empty draft");
+  harness.cleanup();
+});
+
+test("manual order leads a new Session through the stock view action", async () => {
+  const orders = [];
+  const harness = makeHarness({
+    workspaceSessionIds: ["a", "b"],
+    current: "a",
+    sessionOverrides: {
+      a: { updatedAt: 1 },
+      b: { blank: false, updatedAt: 2 }
+    },
+    view: { syncSessionOrders: (value) => orders.push(value) },
+    viewState: {
+      orderBy: "manual",
+      sessionOrderByAccount: { w: ["a"] }
+    }
+  });
+  await tick(200);
+  assert.equal(orders.length, 1, "the saved order is repaired once");
+  assert.equal(JSON.stringify(orders[0].w), JSON.stringify(["a", "b"]), "the draft stays first and the new ordinary Session follows");
+  harness.cleanup();
+});
+
+test("updated order never writes the saved manual order", async () => {
+  const orders = [];
+  const harness = makeHarness({
+    workspaceSessionIds: ["a", "b"],
+    current: "a",
+    sessionOverrides: {
+      a: { updatedAt: 1 },
+      b: { blank: false, updatedAt: 2 }
+    },
+    view: { syncSessionOrders: (value) => orders.push(value) },
+    viewState: {
+      orderBy: "updated",
+      sessionOrderByAccount: { w: ["a"] }
+    }
+  });
+  await tick(200);
+  assert.equal(orders.length, 0, "recent-update mode is left to the stock recency sort");
   harness.cleanup();
 });

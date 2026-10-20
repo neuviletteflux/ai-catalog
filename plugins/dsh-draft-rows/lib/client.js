@@ -31,6 +31,11 @@ var module = { exports: {} }; var exports = module.exports;
  * 5. Order: draft rows are visually pinned above ordinary AND pinned
  *    sessions, inside their Workspace, through CSS `order` on the stock
  *    tree rows. `data-dsh-draft-primary` marks the single New Session row.
+ *    In manual order mode the visible drafts and sessions that the saved
+ *    order has never seen are also led in that saved order (all other rows
+ *    keep their relative order), so a New Session is not appended behind the
+ *    Workspace watermark. The stock session-list `ids` order is never
+ *    rewritten; recency mode already sorts by `updatedAt`.
  * 6. Discard: the stock row menu's Archive discards a draft; the preview is
  *    pruned when the archived-set changes.
  *
@@ -40,6 +45,8 @@ var module = { exports: {} }; var exports = module.exports;
 var NS = "draftRows";
 var STORAGE_KEY = "dsh.drafts.v1";
 var MODE_KEY = "dsh.drafts.mode";
+var VIEW_KEY = "dsh.workspace.view.v5";
+var FLAT_ORDER_KEY = "__flat_session_order__";
 var PATCH = Symbol.for("dsh-draft-rows/patch");
 var PREVIEW_MAX = 60;
 var PREVIEW_CAP = 200;
@@ -242,6 +249,104 @@ function planDraftRows(stock, workspaceSnapshot, previews, archived, currentId) 
   return { hidden: hidden, visible: visible, canonical: canonical, ordered: ordered };
 }
 
+/** Whether two id sequences are identical. */
+function sameIds(left, right) {
+  if (left.length !== right.length) return false;
+  for (var i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false;
+  }
+  return true;
+}
+
+/**
+ * Lead visible drafts and never-ordered Sessions in the saved manual order.
+ *
+ * The stock manual order appends unknown members after every saved member, so a
+ * new Session lands at the end of its Workspace and can fall behind the
+ * watermark. This returns a per-account order that keeps every saved member's
+ * relative position but puts visible drafts first, then the Sessions the saved
+ * order has never seen (newest first). Accounts without a saved order are left
+ * untouched; the stock updated mode ignores the saved order entirely.
+ *
+ * @param stock - raw `sessions.list` snapshot.
+ * @param workspaceSnapshot - `workspaces.list` snapshot.
+ * @param draftIds - visible draft ids from {@link planDraftRows}.
+ * @param savedByAccount - persisted manual order per workspace / ungrouped / flat.
+ * @param archived - archived Session ids.
+ * @returns `orders` for {@link syncSessionOrders} and whether anything changed.
+ */
+function leadManualOrders(stock, workspaceSnapshot, draftIds, savedByAccount, archived) {
+  var orders = {};
+  var changed = false;
+  if (stock === undefined || stock === null || stock.byId === undefined || stock.byId === null) {
+    return { orders: orders, changed: changed };
+  }
+  var savedMap = savedByAccount === undefined || savedByAccount === null ? {} : savedByAccount;
+  var archivedSet = archived === undefined || archived === null ? new Set() : archived;
+  var drafts = draftIds === undefined || draftIds === null ? new Set() : draftIds;
+  var groups = [];
+  var accounted = new Set();
+  var items = (workspaceSnapshot && workspaceSnapshot.items) || [];
+  for (var i = 0; i < items.length; i += 1) {
+    var key = items[i].workspaceId === undefined ? "" : items[i].workspaceId;
+    var memberIds = items[i].sessionIds || [];
+    for (var j = 0; j < memberIds.length; j += 1) accounted.add(memberIds[j]);
+    groups.push({ key: key, ids: memberIds });
+  }
+  var stray = [];
+  var listIds = stock.ids || [];
+  for (var k = 0; k < listIds.length; k += 1) {
+    var straySummary = stock.byId[listIds[k]];
+    if (!accounted.has(listIds[k]) && straySummary !== undefined && straySummary !== null) stray.push(listIds[k]);
+  }
+  groups.push({ key: "", ids: stray });
+  var flat = [];
+  for (var m = 0; m < listIds.length; m += 1) {
+    var flatSummary = stock.byId[listIds[m]];
+    if (flatSummary !== undefined && flatSummary !== null && flatSummary.origin !== "subagent") flat.push(listIds[m]);
+  }
+  groups.push({ key: FLAT_ORDER_KEY, ids: flat });
+
+  for (var g = 0; g < groups.length; g += 1) {
+    var saved = savedMap[groups[g].key];
+    if (!Array.isArray(saved)) continue;
+    var members = groups[g].ids;
+    var memberSet = new Set(members);
+    var savedSet = new Set(saved);
+    var draftRows = [];
+    var newRows = [];
+    for (var d = 0; d < members.length; d += 1) {
+      var id = members[d];
+      var summary = stock.byId[id];
+      if (summary === undefined || summary === null) continue;
+      if (isDraft(summary)) {
+        if (drafts.has(id)) draftRows.push(summary);
+        continue;
+      }
+      if (summary.origin === "subagent" || archivedSet.has(id)) continue;
+      if (!savedSet.has(id)) newRows.push(summary);
+    }
+    draftRows.sort(compareDrafts);
+    newRows.sort(compareDrafts);
+    var order = [];
+    var seen = new Set();
+    var append = function (sessionId) {
+      if (!memberSet.has(sessionId) || seen.has(sessionId)) return;
+      order.push(sessionId);
+      seen.add(sessionId);
+    };
+    for (var r = 0; r < draftRows.length; r += 1) append(draftRows[r].id);
+    for (var n = 0; n < newRows.length; n += 1) append(newRows[n].id);
+    for (var s = 0; s < saved.length; s += 1) append(saved[s]);
+    for (var u = 0; u < members.length; u += 1) append(members[u]);
+    if (!sameIds(order, saved)) {
+      orders[groups[g].key] = order;
+      changed = true;
+    }
+  }
+  return { orders: orders, changed: changed };
+}
+
 /**
  * Project every visible draft into an ordinary row with a preview title.
  * `hidden` omits the extra empty drafts collapsed by {@link planDraftRows}.
@@ -427,6 +532,7 @@ function installBehavior(ctx) {
   var shells = new Map();
   var persistTimer;
   var wakeTimer;
+  var orderTimer;
   var scanFrame;
   var observer;
   var disposed = false;
@@ -475,16 +581,65 @@ function installBehavior(ctx) {
     return value;
   }
 
+  /** Persisted workspace view state, or undefined when absent/unreadable. */
+  function readViewState() {
+    try {
+      if (typeof localStorage === "undefined") return undefined;
+      var raw = localStorage.getItem(VIEW_KEY);
+      if (raw === null) return undefined;
+      var parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== "object") return undefined;
+      return parsed;
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
+  /**
+   * Keep visible drafts and new Sessions at the top of the saved manual order.
+   *
+   * `syncSessionOrders` is a stock view action: it is a no-op outside manual
+   * mode, so updated mode keeps its recency order untouched. Only the leading
+   * members are added; every saved member keeps its relative position.
+   */
+  function leadRows() {
+    orderTimer = undefined;
+    if (disposed) return;
+    var view = uiWorkspace.view;
+    if (view === undefined || view === null || typeof view.syncSessionOrders !== "function") return;
+    var state = readViewState();
+    if (state === undefined || state.orderBy !== "manual"
+      || state.sessionOrderByAccount === undefined || state.sessionOrderByAccount === null) return;
+    var stock = stockGet();
+    var workspaceSnapshot = workspaces.list.getSnapshot();
+    if (workspaceSnapshot === undefined || workspaceSnapshot === null) {
+      scheduleLead();
+      return;
+    }
+    if (stock.phase !== "ready" || workspaceSnapshot.phase !== "ready") {
+      scheduleLead();
+      return;
+    }
+    var plan = currentPlan();
+    var led = leadManualOrders(stock, workspaceSnapshot, plan.visible, state.sessionOrderByAccount, archived);
+    if (!led.changed) return;
+    try {
+      view.syncSessionOrders(led.orders);
+    } catch (error) {
+      console.warn("[draft-rows] order lead failed:", error);
+    }
+  }
+
+  function scheduleLead() {
+    if (orderTimer !== undefined || disposed) return;
+    orderTimer = setTimeout(leadRows, 120);
+  }
+
   function project() {
     var stock = stockGet();
     var plan = currentPlan();
     if (cache !== undefined && cache.stock === stock && cache.plan === plan) return cache.value;
     var value = projectDraftList(stock, previews, t("newSession"), archived, t("draftPrefix"), plan.hidden);
-    if (value !== stock && plan.ordered.length > 0) {
-      var seen = new Set(plan.ordered);
-      var rest = (value.ids || []).filter(function (id) { return !seen.has(id); });
-      value = Object.assign({}, value, { ids: plan.ordered.concat(rest) });
-    }
     cache = { stock: stock, plan: plan, value: value };
     return value;
   }
@@ -711,9 +866,11 @@ function installBehavior(ctx) {
     syncShells();
     prunePreviews();
     scanRowsSoon();
+    scheduleLead();
   });
   var offWorkspaces = workspaces.list.subscribe(function () {
     syncArchived();
+    scheduleLead();
   });
 
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
@@ -734,12 +891,14 @@ function installBehavior(ctx) {
   syncArchived();
   syncShells();
   scanRowsSoon();
+  scheduleLead();
   setTimeout(function () {
     if (disposed) return;
     syncArchived();
     syncShells();
     prunePreviews();
     scanRowsSoon();
+    scheduleLead();
   }, 0);
 
   console.info("[draft-rows] installed; New Session mode =", mode);
@@ -761,6 +920,7 @@ function installBehavior(ctx) {
     shells.clear();
     if (persistTimer !== undefined) clearTimeout(persistTimer);
     if (wakeTimer !== undefined) clearTimeout(wakeTimer);
+    if (orderTimer !== undefined) clearTimeout(orderTimer);
     if (scanFrame !== undefined) {
       if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(scanFrame);
       else clearTimeout(scanFrame);
@@ -802,6 +962,7 @@ exports.__test = {
   recentWorkspace: recentWorkspace,
   findReusableDraft: findReusableDraft,
   planDraftRows: planDraftRows,
+  leadManualOrders: leadManualOrders,
   projectDraftList: projectDraftList
 };
 

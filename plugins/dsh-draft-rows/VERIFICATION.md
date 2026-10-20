@@ -42,6 +42,23 @@ node --test tests/logic.test.mjs tests/apply.test.mjs
 
 结果：12 个测试全部通过（预览截断、draft 判定、折叠计划、投影、复用规则、单槽优先、patch 行为）。
 
+### 0.2.1 手动排序下的新会话位置
+
+`node --test tests/logic.test.mjs tests/apply.test.mjs` 结果：16 个测试全部通过。新增覆盖：
+
+- `leadManualOrders`：可见草稿排最前，其次是保存顺序里没有的新会话，然后是原保存成员；原有成员的相对顺序不变。
+- 已排好的顺序再次计算时 `changed = false`，不会重复写入。
+- 没有保存顺序的 account 保持原样（最近更新模式或首次手动模式交给 stock 处理）。
+- typed 草稿即使已经在保存顺序中，也会被提到保存成员之前。
+- `projectDraftList` 不再改写 `sessions.list.ids`：投影保留 stock 顺序（`tests/apply.test.mjs` 更新断言）。
+
+隔离 Web Host E2E（同 `0.2.1-rc.2`，临时 `DSH_HOME`，`link:` 安装）：
+
+1. 侧边栏切到**手动排序**，写入一条带保存顺序的 workspace。
+2. 把第二个普通会话日志复制进该 workspace 并重启 host。
+3. 打开页面后读取 `localStorage["dsh.workspace.view.v5"]`：新会话 id 已被插到该 workspace 与 flat 保存顺序的最前面，原来的会话仍在其后。
+4. 侧边栏目视顺序：新会话在旧会话之前；默认 workspace 的「新会话」草稿仍在置顶草稿之上（CSS `order`）。
+
 ### 0.2.0 单新会话与置顶排序
 
 `node --test tests/logic.test.mjs tests/apply.test.mjs` 结果：12 个测试全部通过。新增覆盖：
@@ -99,6 +116,7 @@ node --test tests/logic.test.mjs tests/apply.test.mjs
 - 草稿附件仍不在 stock conversation 快照里；附件-only 草稿显示 `[附件]` 并视为占用，但附件本身切换后会丢。
 - 草稿行通过 `sessions.list.getSnapshot` 投影实现；未来 renderer/状态形状变化时需要重新验证。
 - 置顶排序是 CSS `order` 的纯视觉排序：DOM 顺序与键盘上下导航仍是 stock 顺序，草稿可能视觉上在置顶行之前、但焦点仍按源顺序移动。
+- 手动排序下只把可见草稿和未出现在保存顺序里的新会话插入最前；已有行相对位置不变。`sessions.list.ids` 的 stock 顺序不再被改写。
 - 排序容器依赖 HoverCard 的 `span` 包裹与 `[role="treeitem"][data-row-key]` 结构；未来 renderer 改用别的包裹层时需要重新验证 `:has(> span > …)` 选择器。
 - 草稿行禁用了双击重命名（预览标题优先）；行菜单里的 Rename 仍可能存在，但显示仍以预览为准。
 - 桌面端升级后如果 `startSession`/`list` 形状变化，插件会降级为 stock；需要按版本重新验证。

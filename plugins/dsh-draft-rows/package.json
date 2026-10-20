@@ -1,7 +1,7 @@
 {
   "name": "dsh-draft-rows",
-  "version": "0.2.0",
-  "description": "Draft sessions for DeepSeek Harness: one New Session row per workspace, typed drafts kept as their own rows, and draft rows sorted above pinned sessions.",
+  "version": "0.2.1",
+  "description": "Draft sessions for DeepSeek Harness: one New Session row per workspace, typed drafts kept as their own rows, draft rows sorted above pinned sessions, and new Sessions led in manual order.",
   "icon": "assets/icon.svg",
   "type": "module",
   "main": "lib/index.js",

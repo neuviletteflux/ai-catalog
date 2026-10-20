@@ -40,7 +40,7 @@ function loadBundle() {
 }
 
 const bundle = loadBundle();
-const { previewOf, isDraft, mainSessionIdOf, findReusableDraft, planDraftRows, projectDraftList } = bundle.__test;
+const { previewOf, isDraft, mainSessionIdOf, findReusableDraft, planDraftRows, leadManualOrders, projectDraftList } = bundle.__test;
 
 function summary(id, overrides = {}) {
   return {
@@ -191,4 +191,38 @@ test("findReusableDraft: multi skips occupied drafts, single reuses the blank", 
 
   const otherCwd = { ...workspace, items: [{ ...workspace.items[0], path: "/other" }] };
   assert.equal(findReusableDraft(stock, otherCwd, previews, "w", "multi"), undefined);
+});
+
+test("leadManualOrders puts visible drafts and new Sessions first without disturbing saved rows", () => {
+  const a = summary("a", { blank: false, updatedAt: 10 }); // saved, ordinary
+  const b = summary("b", { blank: false, updatedAt: 20 }); // saved, ordinary
+  const c = summary("c", { blank: false, updatedAt: 30 }); // new ordinary
+  const d = summary("d", { blank: true, updatedAt: 40 }); // visible draft
+  const e = summary("e", { blank: true, updatedAt: 50 }); // hidden empty draft
+  const f = summary("f", { blank: false, updatedAt: 60, origin: "subagent" }); // hidden child
+  const g = summary("g", { blank: false, updatedAt: 70 }); // new archived ordinary
+  const stock = list(["a", "b", "e", "c", "d", "f", "g"], { a, b, c, d, e, f, g });
+  const workspace = {
+    items: [{ workspaceId: "w", path: "/w", sessionIds: ["a", "b", "c", "d", "e", "f", "g"] }],
+    archivedSessionIds: ["g"]
+  };
+  const saved = { w: ["b", "a", "e"] };
+  const led = leadManualOrders(stock, workspace, new Set(["d"]), saved, new Set(["g"]));
+  assert.equal(led.changed, true);
+  assert.deepEqual(Array.from(led.orders.w), ["d", "c", "b", "a", "e", "f", "g"], "draft, new ordinary, saved rows, then leftovers");
+
+  const unchanged = leadManualOrders(stock, workspace, new Set(["d"]), { w: ["d", "c", "b", "a", "e", "f", "g"] }, new Set(["g"]));
+  assert.equal(unchanged.changed, false, "an already led order is stable");
+
+  const noSaved = leadManualOrders(stock, workspace, new Set(["d"]), {}, new Set(["g"]));
+  assert.equal(noSaved.changed, false, "accounts without a saved manual order are untouched");
+});
+
+test("leadManualOrders leads typed drafts that the saved order already contains", () => {
+  const a = summary("a", { blank: false, updatedAt: 10 });
+  const draft = summary("d", { blank: true, updatedAt: 40 });
+  const stock = list(["a", "d"], { a, d: draft });
+  const workspace = { items: [{ workspaceId: "w", path: "/w", sessionIds: ["a", "d"] }], archivedSessionIds: [] };
+  const led = leadManualOrders(stock, workspace, new Set(["d"]), { w: ["a", "d"] }, new Set());
+  assert.deepEqual(Array.from(led.orders.w), ["d", "a"], "the draft moves above the saved rows");
 });

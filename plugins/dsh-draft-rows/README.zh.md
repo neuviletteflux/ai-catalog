@@ -8,12 +8,12 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.2.0` |
-| DSH Host | `0.2.1-rc.2` 已验证（Web 客户端，0.2.0 E2E） |
+| 版本 | `0.2.1` |
+| DSH Host | `0.2.1-rc.2` 已验证（Web 客户端，0.2.1 E2E） |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
 | 网络 | 无 |
-| 存储 | `dsh.conversation.*`、`dsh.drafts.v1`、`dsh.drafts.mode` |
+| 存储 | `dsh.conversation.*`、`dsh.drafts.v1`、`dsh.drafts.mode`；只读 `dsh.workspace.view.v5` |
 
 社区插件，不是 DeepSeek 官方产品。
 
@@ -24,6 +24,7 @@
 - 新会话复用这个空草稿；只有所有草稿都有文字时，才新建 session id（Cursor / Telegram 的行为）。
 - 已经写了文字的草稿保持为独立行；点回去，文字原样恢复。
 - 草稿行在所属 workspace 内排在普通会话和**置顶会话**之前。
+- 在**手动排序**模式下，可见草稿和保存顺序里从未出现过的新会话会被放到该 workspace 保存顺序的最前面；其余会话保持原有相对顺序，不会被草稿功能打乱。
 - 切走再切回、刷新页面，草稿都不会丢。
 - 通过行菜单的**归档**丢弃草稿，预览会同步清理。
 
@@ -105,7 +106,7 @@ dsh plugin --profile web remove dsh-draft-rows
 
 ## 兼容与限制
 
-0.2.0 已在 DSH `0.2.1-rc.2` 上验证：单元测试，加上隔离 Web Host E2E，覆盖单行折叠、New Session 复用、刷新恢复和置顶行之前的排序。所有补丁都是实例级、带特性检测；服务或形状不匹配时保持 stock 行为不变，只打印一条 warning。client bundle 通过 `window.__ModuleLoader__.load` 加载，与其他 DSH 客户端插件走同一通道。`engines.dsh` 只是目标范围，不是兼容性保证；只有上面这个版本经过验证。
+0.2.1 已在 DSH `0.2.1-rc.2` 上验证：单元测试，加上隔离 Web Host E2E，覆盖单行折叠、New Session 复用、刷新恢复、置顶行之前的排序，以及手动排序下新会话进入保存顺序最前。所有补丁都是实例级、带特性检测；服务或形状不匹配时保持 stock 行为不变，只打印一条 warning。client bundle 通过 `window.__ModuleLoader__.load` 加载，与其他 DSH 客户端插件走同一通道。`engines.dsh` 只是目标范围，不是兼容性保证；只有上面这个版本经过验证。
 
 已知限制：
 
@@ -113,6 +114,7 @@ dsh plugin --profile web remove dsh-draft-rows
 - stock conversation 快照不包含草稿附件；只有附件的草稿会显示 `[附件]` 预览并被当作“已占用”，但附件本身在切换后仍会丢失。
 - 草稿行通过 `sessions.list.getSnapshot` 投影实现；未来 renderer 变化时需要重新验证。预览文字、标题和新会话规则不依赖 DOM class。
 - 置顶排序只是视觉上的：CSS `order` 把草稿行提到置顶行之前，但 DOM 顺序与键盘上下导航仍是 stock 顺序，焦点可能按原顺序移动。
+- 手动排序下，插件只把可见草稿和“尚未出现在保存顺序里”的新会话插到最前；已有会话的相对位置不变。最近更新模式不写保存顺序。
 - 排序容器依赖当前的 HoverCard `span` 包裹与 `[role="treeitem"][data-row-key]` 结构；renderer 改动后可能需要重写选择器。
 - 草稿行禁用了双击重命名（标题由预览决定）；行菜单里的 Rename 仍可能打开，但显示仍以预览为准。
 
@@ -122,6 +124,7 @@ dsh plugin --profile web remove dsh-draft-rows
 - 影子化 `sessions.list.getSnapshot`，把每个 blank 草稿投影成带预览标题的普通行。
 - 每个 workspace 只保留一个可见空草稿：优先当前空草稿，否则用最新的空草稿。
 - 用 CSS `order` 把草稿行提到普通行和置顶行之前；唯一的「新会话」行单独标记。
+- 手动排序下调用 stock 的 `uiWorkspace.view.syncSessionOrders`，把可见草稿和未入序的新会话插到保存顺序最前；最近更新模式下该 action 本身是 no-op。`sessions.list.ids` 的 stock 顺序不会被改写。
 - 订阅 `conversation.input`，把当前输入镜像到 `dsh.drafts.v1`，刷新后仍能恢复预览。
 - 不修改任何 DSH 核心文件。
 

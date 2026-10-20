@@ -10,12 +10,12 @@ New Session stops minting a fresh session id every time.
 
 | Item | Value |
 |---|---|
-| Version | `0.2.0` |
-| DSH host | `0.2.1-rc.2` verified (web client, 0.2.0 E2E) |
+| Version | `0.2.1` |
+| DSH host | `0.2.1-rc.2` verified (web client, 0.2.1 E2E) |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
 | Network | none |
-| Storage | `dsh.conversation.*`, `dsh.drafts.v1`, `dsh.drafts.mode` |
+| Storage | `dsh.conversation.*`, `dsh.drafts.v1`, `dsh.drafts.mode`; reads `dsh.workspace.view.v5` |
 
 Community plugin, not an official DeepSeek product.
 
@@ -30,6 +30,9 @@ Community plugin, not an official DeepSeek product.
   intact.
 - Draft rows are sorted above ordinary **and pinned** sessions inside their
   workspace.
+- In **manual order** mode, visible drafts and Sessions that the saved order has
+  never seen are led in that order; every other row keeps its relative position,
+  so the draft feature never shuffles the rest of the list.
 - Switching away and back, or reloading, keeps the draft.
 - The stock row menu's **Archive** discards a draft and removes its preview.
 
@@ -123,9 +126,10 @@ localStorage keys listed above; reinstalling may surface the same drafts again.
 
 ## Compatibility and limits
 
-0.2.0 was verified end-to-end against DSH `0.2.1-rc.2` in an isolated web host:
-duplicate empty drafts collapse to one row, New Session reuses it, and draft
-rows render above pinned rows. Every patch is instance-level and feature
+0.2.1 was verified end-to-end against DSH `0.2.1-rc.2` in an isolated web host:
+duplicate empty drafts collapse to one row, New Session reuses it, draft rows
+render above pinned rows, and in manual order a new Session leads the saved
+order instead of being appended. Every patch is instance-level and feature
 detected; when a service or shape is missing, the plugin leaves stock behavior
 untouched and logs one warning. The client bundle is loaded through
 `window.__ModuleLoader__.load`, the same channel as other DSH client plugins.
@@ -137,9 +141,12 @@ Known limits:
 - Collapsed empty drafts still exist on the Host and are reused; they are not
   deleted. The one-row rule applies per workspace, with the ungrouped bucket
   counting as one workspace.
-- Ordering is visual only (`CSS order`): DOM and keyboard navigation keep the
+- Pinned ordering is visual (`CSS order`): DOM and keyboard navigation keep the
   stock order, and the selectors depend on the stock tree's HoverCard wrapper
   spans and `data-row-key` attributes.
+- In manual order mode, only visible drafts and Sessions missing from the saved
+  order are inserted at the front; saved rows keep their relative positions.
+  Recent-update mode never writes the saved order.
 - Draft attachments are not persisted by the stock conversation snapshot;
   attachment-only drafts show `[附件]` as their preview and are treated as
   occupied, but the attachment itself is still lost on switch.
@@ -158,6 +165,10 @@ Known limits:
   current empty draft wins, otherwise the newest one.
 - CSS `order` lifts draft rows above ordinary and pinned rows; the single New
   Session row is marked separately.
+- In manual order mode, the stock `uiWorkspace.view.syncSessionOrders` action
+  leads visible drafts and never-ordered Sessions in the saved order. The action
+  is a no-op in recent-update mode, and the stock `sessions.list.ids` order is
+  never rewritten.
 - `conversation.input` is subscribed to mirror the current composer text into
   `dsh.drafts.v1`, so previews survive reloads.
 - No DSH core file is modified.
