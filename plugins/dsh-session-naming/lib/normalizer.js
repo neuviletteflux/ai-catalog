@@ -28,6 +28,13 @@ export const GOAL_TYPES = TYPES.filter((type) => type !== 'AUTO')
 /** Shape of a compliant title: `[Branch｜]MMDD｜type｜goal`. */
 export const CONVENTION = /^(?:Branch｜)?\d{4}｜(?:分析|规划|实施|排障|审计|查询|整理|复盘|AUTO)｜/u
 
+/**
+ * Any convention-shaped prefix, including a type outside the vocabulary.
+ * Normalization strips this whole prefix so `1020｜开发｜…` cannot leak the
+ * date/type into the goal.
+ */
+export const TITLE_PREFIX = /^(?:Branch｜)?\d{4}｜[^｜|]{1,16}｜/u
+
 /** Default settle window; long enough for the built-in LLM summary to land. */
 export const DEFAULT_SETTLE_MS = 10000
 
@@ -66,19 +73,100 @@ export async function logLine(line) {
   }
 }
 
-/** Type keywords, checked in order; the first hit wins. */
-const TYPE_KEYWORDS = [
-  ['排障', /(报错|失败|错误|无法|不能|崩溃|修复|坏|异常|超时|卡住|不生效|没生效|error|fail|bug|crash|fix)/iu],
-  ['审计', /(审计|盘点|核查|核对|合规|一致性|对照|inspect|audit)/iu],
-  ['复盘', /(复盘|回顾|retro|postmortem)/iu],
-  ['整理', /(整理|总结|汇总|清单|归纳|周报|简报|纪要|摘要|organize|summary)/iu],
-  ['规划', /(规划|方案|设计|怎么做|路线|计划|拆解|roadmap|plan|design)/iu],
-  ['查询', /(是什么|含义|表示什么|怎么查|如何|在哪|有没有|查询|查看|哪种|哪些|哪个|多少|咨询|介绍|what|how|where|which)/iu],
-  ['实施', /(实现|实施|安装|部署|配置|改成|加上|接入|迁移|升级|重构|新建|构建|搭建|install|deploy|implement|migrate|upgrade)/iu],
+/**
+ * Type signals used by the title scorer.
+ *
+ * `strong` marks the activity itself; `leading` gives a bonus when the title
+ * opens with that activity verb; `artifact` gives a bonus when the title ends
+ * in a deliverable noun (方案/报告/清单/复盘/分析). `weak` is reserved for
+ * lookup/question words and never outweighs a title action.
+ */
+const FAILURE = /(报错|失败|错误|无法|不能|崩溃|坏|异常|超时|卡住|不生效|没生效|error|fail|bug|crash)/iu
+const QUESTION_START = /^(?:(?:如何|怎么|怎样|什么|为什么|是否|哪些|哪个|多少|在哪|有没有)|(?:what|how|why|which|where|who)\b)/iu
+const QUESTION_END = /[?？]\s*$/u
+const QUERY_WEAK = /(是什么|含义|表示什么|怎么查|如何|在哪|有没有|哪种|哪些|哪个|多少|咨询|介绍|版本|what|how|where|which|是否|为什么|怎么)/iu
+
+const ARTIFACT_PLAN = /(?:方案|计划|路线|设计|拆解)\s*(?:[（(]\d+[)）])?\s*$/u
+const ARTIFACT_AUDIT = /(?:报告|评审|审计|核查|验收)\s*(?:[（(]\d+[)）])?\s*$/u
+const ARTIFACT_ORGANIZE = /(?:清单|纪要|周报|简报|摘要|总结|汇总)\s*(?:[（(]\d+[)）])?\s*$/u
+const ARTIFACT_RETRO = /复盘\s*(?:[（(]\d+[)）])?\s*$/u
+const ARTIFACT_ANALYSIS = /(?:分析|评估|调研|对比|差异)\s*(?:[（(]\d+[)）])?\s*$/u
+
+const TYPE_SIGNALS = [
+  {
+    type: '排障',
+    strong: /(报错|失败|错误|无法|不能|崩溃|坏|异常|超时|卡住|不生效|没生效|修复|排查|定位|回归|error|fail|bug|crash|fix)/iu,
+    leading: /^(?:修复|排查|定位|诊断|解决|处理|修好)/u,
+    artifact: null,
+  },
+  {
+    type: '实施',
+    strong: /(实现|实施|安装|部署|配置|改成|改为|加上|接入|迁移|升级|重构|新建|构建|搭建|优化|移动|清理|重做|落地|分发|发布|新增|删除|改造|调整|合并|编写|启动|停用|关闭|开启|验证|复测|install|deploy|implement|migrate|upgrade|refactor)/iu,
+    leading: /^(?:实现|实施|安装|部署|配置|改成|改为|加上|接入|迁移|升级|重构|新建|构建|搭建|优化|移动|清理|重做|发布|新增|删除|改造|调整|合并|编写|启动|停用|关闭|开启)/u,
+    artifact: null,
+  },
+  {
+    type: '审计',
+    strong: /(审计|盘点|核查|核对|合规|一致性|对照|评审|验收|inspect|audit)/iu,
+    leading: /^(?:审计|盘点|核查|核对|评审|验收)/u,
+    artifact: ARTIFACT_AUDIT,
+  },
+  {
+    type: '规划',
+    strong: /(规划|方案|设计|路线|计划|拆解|roadmap|plan|design)/iu,
+    leading: /^(?:规划|设计|计划|拆解)/u,
+    artifact: ARTIFACT_PLAN,
+  },
+  {
+    type: '整理',
+    strong: /(整理|总结|汇总|清单|归纳|周报|简报|纪要|摘要|输出|导出|organize|summary)/iu,
+    leading: /^(?:整理|总结|汇总|归纳|输出|导出)/u,
+    artifact: ARTIFACT_ORGANIZE,
+  },
+  {
+    type: '复盘',
+    strong: /(复盘|回顾|retro|postmortem)/iu,
+    leading: /^(?:复盘|回顾)/u,
+    artifact: ARTIFACT_RETRO,
+  },
+  {
+    type: '分析',
+    strong: /(分析|评估|调研|对比|差异|原理|机制|研究|根因|analysis|analyze|evaluate|compare)/iu,
+    leading: /^(?:分析|评估|调研|对比|研究)/u,
+    artifact: ARTIFACT_ANALYSIS,
+  },
+  {
+    type: '查询',
+    strong: /(查询|查看|查找|搜索|检索|检查|确认|核实|lookup|search|find)/iu,
+    leading: /^(?:查询|查看|查找|搜索|检索|列出|看看|介绍|说明)/u,
+    weak: QUERY_WEAK,
+    artifact: null,
+  },
 ]
+
+/** Tie-break order: concrete work beats lookup; diagnosis beats execution. */
+const TYPE_PRIORITY = ['排障', '实施', '审计', '规划', '整理', '复盘', '分析', '查询']
+const PRIORITY = new Map(TYPE_PRIORITY.map((type, index) => [type, index]))
 
 /** Fallback type when no keyword matches. */
 export const DEFAULT_TYPE = '分析'
+
+/** A pure question asks for information; a failure question is diagnosis. */
+function isPureQuestion(title) {
+  if (!QUESTION_START.test(title) && !QUESTION_END.test(title)) return false
+  return !FAILURE.test(title)
+}
+
+/** Weighted score for one type signal. */
+function scoreSignal(signal, title, message) {
+  let score = 0
+  if (signal.strong.test(title)) score += 3
+  if (signal.leading.test(title)) score += 2
+  if (signal.artifact !== null && signal.artifact.test(title)) score += 3
+  if (signal.strong.test(message)) score += 1
+  if (signal.weak?.test(title)) score += 1
+  return score
+}
 
 /** Whether a title already follows the convention. */
 export function isConventionTitle(title) {
@@ -100,14 +188,32 @@ export function truncateBytes(text, maxBytes) {
 }
 
 /**
- * Infer a type from the title and first human message.
- * @param text - haystack used for keyword matching.
+ * Infer a type from the title and the first human message.
+ *
+ * The title dominates: action words in the title outrank question words in the
+ * prompt. A pure question with no failure signal is a lookup; otherwise the
+ * highest weighted score wins, with a stable tie-break order.
+ * @param title - session title.
+ * @param firstMessage - first human message text (optional).
  */
-export function pickType(text) {
-  const haystack = String(text ?? '')
-  for (const [type, pattern] of TYPE_KEYWORDS) {
-    if (pattern.test(haystack)) return type
+export function pickType(title, firstMessage = '') {
+  const titleText = oneLine(title)
+  const messageText = oneLine(firstMessage)
+  if (titleText === '') return DEFAULT_TYPE
+  if (isPureQuestion(titleText)) return '查询'
+  let winner
+  let winnerScore = 0
+  for (const signal of TYPE_SIGNALS) {
+    const score = scoreSignal(signal, titleText, messageText)
+    if (score === 0) continue
+    if (winner === undefined || score > winnerScore
+      || (score === winnerScore && PRIORITY.get(signal.type) < PRIORITY.get(winner))) {
+      winner = signal.type
+      winnerScore = score
+    }
   }
+  if (winner !== undefined) return winner
+  if (QUERY_WEAK.test(titleText)) return '查询'
   return DEFAULT_TYPE
 }
 
@@ -123,7 +229,7 @@ export function composeNormalized(input) {
   const room = maxBytes - utf8Bytes(head)
   if (room < 3) throw new Error(`session-naming-normalizer: 字节预算 ${maxBytes} 放不下 "${head}"`)
   const goal = oneLine(input?.goal)
-    .replace(/^(?:Branch｜)?\d{4}｜(?:分析|规划|实施|排障|审计|查询|整理|复盘|AUTO)｜/u, '')
+    .replace(TITLE_PREFIX, '')
     .replace(/[｜|]/gu, ' ')
     .trim()
   const text = truncateBytes(goal, room)
@@ -188,7 +294,7 @@ export function normalizeNow(ctx, session, options = {}) {
     : DEFAULT_MAX_TITLE_BYTES
   const title = composeNormalized({
     goal: current.title,
-    type: pickType(`${current.title} ${firstHumanText(session)}`),
+    type: pickType(current.title, firstHumanText(session)),
     createdAt: header.createdAt,
     maxBytes,
     branch: false,

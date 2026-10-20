@@ -57,7 +57,7 @@ test('isConventionTitle accepts ordinary and branch titles only', () => {
   assert.equal(isConventionTitle(undefined), false)
 })
 
-test('pickType follows the keyword order and falls back to 分析', () => {
+test('pickType keeps the established vocabulary cases', () => {
   assert.equal(pickType('修复 codex 启动失败'), '排障')
   assert.equal(pickType('盘点本地插件'), '审计')
   assert.equal(pickType('复盘这次发布'), '复盘')
@@ -67,6 +67,34 @@ test('pickType follows the keyword order and falls back to 分析', () => {
   assert.equal(pickType('实现会话命名插件'), '实施')
   assert.equal(pickType('随便聊聊'), '分析')
   assert.equal(pickType(''), '分析')
+})
+
+test('pickType weights title actions above prompt question words', () => {
+  const cases = [
+    ['安装插件并质询UI优化', '', '实施'],
+    ['新会话草稿插件实现与分发', '', '实施'],
+    ['移动其它工作区会话', '', '实施'],
+    ['文档配图弃用Mermaid重做', '', '实施'],
+    ['Session naming skills 实现', '', '实施'],
+    ['配置私有LLM模型Game Engine', '', '实施'],
+    ['检查全局配置是否生效', '', '查询'],
+    ['指令中英文规范差异分析', '', '分析'],
+    ['分析 readability 插件实现原理', '他是如何实现的', '分析'],
+    ['基于证据的项目审计与认知报告', '', '审计'],
+    ['实时数仓同步方案评审', '', '审计'],
+    ['盘点分析已安装的 skills 与 plugins', '', '审计'],
+    ['重构控制台页面方案 (1)', '', '规划'],
+    ['dsh web 最新版本与本地版本', '', '查询'],
+    ['查询已安装的画图技能', '', '查询'],
+    ['为什么安装失败', '', '排障'],
+    ['如何排查启动失败', '', '排障'],
+    ['主题', '帮我安装插件', '实施'],
+    ['安装插件', '如何实现', '实施'],
+    ['Acknowledgment and Confirmation', '', '分析'],
+  ]
+  for (const [title, message, expected] of cases) {
+    assert.equal(pickType(title, message), expected, `${title} || ${message}`)
+  }
 })
 
 test('truncateBytes never splits a code point', () => {
@@ -98,6 +126,30 @@ test('composeNormalized replaces inner separators and supports branches', () => 
   assert.equal(
     composeNormalized({ goal: '主题', type: '分析', createdAt, maxBytes: 80, branch: true }),
     'Branch｜0105｜分析｜主题',
+  )
+})
+
+test('composeNormalized strips any convention-shaped prefix, including unknown types', () => {
+  assert.equal(
+    composeNormalized({
+      goal: '1020｜开发｜Session naming skills 改为 dsh 插件',
+      type: '实施',
+      createdAt,
+      maxBytes: 80,
+    }),
+    '0105｜实施｜Session naming skills 改为 dsh 插件',
+  )
+  assert.equal(
+    composeNormalized({ goal: '0105｜未知类型｜目标', type: '分析', createdAt, maxBytes: 80 }),
+    '0105｜分析｜目标',
+  )
+  assert.equal(
+    composeNormalized({ goal: 'Branch｜1020｜开发｜目标', type: '分析', createdAt, maxBytes: 80 }),
+    '0105｜分析｜目标',
+  )
+  assert.equal(
+    composeNormalized({ goal: '1020｜开发｜A｜B', type: '分析', createdAt, maxBytes: 80 }),
+    '0105｜分析｜A B',
   )
 })
 

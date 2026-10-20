@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1 — 2026-10-20
+
+- Type inference is now weighted: the title dominates the first human message,
+  action verbs outrank question words, a leading verb gets a bonus, and a
+  deliverable suffix (方案/报告/清单/复盘/分析) selects the artifact type.
+- A pure question with no failure signal is classified as `查询`; failure
+  questions stay `排障`. Added keywords for 优化、移动、清理、重做、落地、分发、
+  评估、差异、原理、评审、验收、输出、导出、验证 and more.
+- Normalization strips any `MMDD｜短类型｜` prefix, including types outside the
+  vocabulary, so `1020｜开发｜…` no longer leaks the prefix into the goal.
+- `isBranchSession` and `isInheritedForkTitle` treat
+  `header.origin === "subagent"` as neither a fork nor an inherited title;
+  subagents never receive the `Branch｜` prefix.
+- Added regression tests for eight misclassified titles, unknown-type prefixes,
+  and subagent branch handling (54 tests total).
+
 ## 0.1.0 — 2026-10-20
 
 - Initial public release as a DSH Profile Bundle.

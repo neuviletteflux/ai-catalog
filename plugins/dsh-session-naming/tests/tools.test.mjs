@@ -69,11 +69,11 @@ function makeCtx(service, { gateway } = {}) {
 
 function makeSession({
   id = 'session-current', createdAt: stamp = createdAt, isSeeded = false,
-  parentSession, events = [], inheritedEventCount = 0,
+  parentSession, origin, events = [], inheritedEventCount = 0,
 } = {}) {
   return {
     id,
-    header: { createdAt: stamp, isSeeded, parentSession },
+    header: { createdAt: stamp, isSeeded, parentSession, origin },
     inheritedEventCount,
     snapshotEvents: () => events,
   }
@@ -128,11 +128,20 @@ test('isInheritedForkTitle accepts the first empty title event as inheritance ev
     events: [{ type: 'session/title', data: { title: '继承标题', messageSeqs: [1] } }],
   })
   assert.equal(isInheritedForkTitle(later, { title: '继承标题' }), false)
+
+  const subagent = makeSession({
+    parentSession: 'parent-missing',
+    origin: 'subagent',
+    events: [{ type: 'session/title', data: { title: '继承标题', messageSeqs: [] } }],
+  })
+  assert.equal(isInheritedForkTitle(subagent, { title: '继承标题' }), false)
 })
 
 test('branch detection uses storage flags and the projection cache', async () => {
   assert.equal(isBranchSession(makeSession({ isSeeded: true })), true)
   assert.equal(isBranchSession(makeSession({ inheritedEventCount: 2 })), true)
+  assert.equal(isBranchSession(makeSession({ parentSession: 'session-parent' })), true)
+  assert.equal(isBranchSession(makeSession({ isSeeded: true, origin: 'subagent' })), false)
   assert.equal(isBranchSession(makeSession()), false)
 
   await writeProjection('branch-true', { identity: { isSeeded: true } })
@@ -167,6 +176,15 @@ test('set_session_title adds the branch prefix automatically', async () => {
   assert.equal(result.title, 'Branch｜0105｜实施｜迁移插件')
   assert.equal(result.branch, true)
   assert.match(result.message, /分支会话已加 Branch｜ 前缀/u)
+})
+
+test('set_session_title does not prefix subagent sessions', async () => {
+  const service = makeService()
+  const tool = setSessionTitleTool(makeCtx(service))
+  const session = makeSession({ isSeeded: true, origin: 'subagent' })
+  const result = await tool.execute({ type: '查询', goal: '主题' }, execFor(session))
+  assert.equal(result.title, '0105｜查询｜主题')
+  assert.equal(result.branch, false)
 })
 
 test('set_session_title accepts raw titles and appends the branch prefix', async () => {

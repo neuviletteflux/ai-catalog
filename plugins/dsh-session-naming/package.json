@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-naming",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH session-naming plugin: set_session_title / rename_session tools plus automatic normalization of the built-in summary title to [Branch｜]MMDD｜type｜goal.",
   "icon": "assets/icon.svg",
   "type": "module",

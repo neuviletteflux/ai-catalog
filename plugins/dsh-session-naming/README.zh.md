@@ -139,6 +139,19 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 （由网关恢复后改名）。它读取投影缓存判断目标是否分支；缓存不可读时**不猜**，并在
 结果里说明未加前缀。
 
+### 类型判定
+
+类型不是按固定顺序取第一个关键词，而是分别给标题与首条人类消息打分：
+
+- 标题强信号 +3；标题开头的动作词 +2；标题结尾的交付物（方案/报告/清单/
+  复盘/分析）+3；
+- 首条人类消息只在强信号时 +1，因此提示词里的“如何”不会压过标题里的动作词；
+- 纯疑问句且没有失败信号时归 `查询`；带失败信号的疑问句仍归 `排障`；
+- 同分时按 `排障 > 实施 > 审计 > 规划 > 整理 > 复盘 > 分析 > 查询` 取。
+
+仍然是确定性启发式；类型偏了用 `set_session_title` 修正，不增加模型调用。
+规范化前会剥掉任意 `MMDD｜短类型｜` 前缀，包括词表外的类型。
+
 ### 规范化器的跳过条件
 
 以下情况一律不碰：
@@ -188,8 +201,8 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
   直接挂载 `lib/index.js`。
 - **新标题没有被规范化。** 等过 `settleMs`；人工标题、分叉/子代理、已合规标题、
   没有人类消息引用的标题都会按设计跳过。
-- **类型推断不准。** 类型靠关键词推断（与人工判断约七成一致），用
-  `set_session_title` 修正即可，不需要改配置。
+- **类型推断不准。** 类型是确定性的加权启发式：标题权重高于首条消息，但读不懂
+  真实意图。用 `set_session_title` 修正即可，不需要改配置。
 - **重复工具报错。** 删掉 Bundle 或 home patch 其中一个挂载。
 - **`dsh plugin --profile desktop …` 报错。** 预期行为：桌面端请用设置页安装。
 - **DSH 升级之后。** 重新安装并重跑测试；如果标题服务契约变了，检查
@@ -210,7 +223,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 51 项 node:test
+npm test                      # 54 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py

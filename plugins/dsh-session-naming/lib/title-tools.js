@@ -83,6 +83,7 @@ export function firstTitleEvent(session) {
  * @returns true when the title may be replaced by the convention title.
  */
 export function isInheritedForkTitle(session, previous) {
+  if (session?.header?.origin === 'subagent') return false
   const parentId = session?.header?.parentSession
   if (typeof parentId !== 'string' || parentId === '') return false
   const parentTitle = titleFromProjectionCache(parentId)
@@ -100,9 +101,18 @@ function budgetOf(service) {
   return Number.isInteger(value) && value > 0 ? value : DEFAULT_MAX_TITLE_BYTES
 }
 
-/** Whether the session is a branch (fork): `header.isSeeded` is written by storage. */
+/**
+ * Whether the session is a branch (fork).
+ *
+ * Subagent sessions also carry `isSeeded`/`inheritedEventCount`, so
+ * `header.origin === 'subagent'` wins first; only non-subagent sessions with
+ * fork evidence get the `Branch｜` prefix.
+ */
 export function isBranchSession(session) {
-  if (session?.header?.isSeeded === true) return true
+  const header = session?.header
+  if (header?.origin === 'subagent') return false
+  if (typeof header?.parentSession === 'string' && header.parentSession !== '') return true
+  if (header?.isSeeded === true) return true
   const inherited = session?.inheritedEventCount
   return typeof inherited === 'number' && inherited > 0
 }

@@ -146,6 +146,23 @@ so it can rename inactive sessions (the gateway resumes them). It reads the
 projection cache to decide whether the target is a branch; when the cache is
 unreadable it does **not** guess and reports that no prefix was added.
 
+### Type inference
+
+The type is not a first-match keyword scan. The title and the first human
+message are scored separately:
+
+- a strong title hit adds 3; a leading activity verb adds 2; a deliverable
+  suffix (方案/报告/清单/复盘/分析) adds 3;
+- the first human message adds 1 only for a strong hit, so a prompt's "如何"
+  cannot override an action word in the title;
+- a pure question with no failure signal is `查询`; a failure question stays
+  `排障`;
+- ties use `排障 > 实施 > 审计 > 规划 > 整理 > 复盘 > 分析 > 查询`.
+
+It remains a deterministic heuristic: when the inferred type is wrong, correct
+it with `set_session_title`; no model call is added. Normalization also strips
+any `MMDD｜短类型｜` prefix, including types outside the vocabulary.
+
 ### Normalizer skips
 
 The normalizer leaves these alone:
@@ -201,9 +218,9 @@ only the version above has been exercised.
 - **A new title was not normalized.** Wait for `settleMs` after the last title
   event. Human titles, forks/subagents, already-compliant titles, and titles
   without human refs are intentionally skipped.
-- **The inferred type is wrong.** The type is keyword-based (~70% agreement with
-  human judgement). Correct it with `set_session_title`; no config override is
-  needed.
+- **The inferred type is wrong.** Type inference is a deterministic weighted
+  heuristic; the title outranks the first message, but it cannot read intent.
+  Correct the title with `set_session_title`; no config override is needed.
 - **Duplicate tool errors.** Remove one of the two mounts (Bundle vs home patch).
 - **`dsh plugin --profile desktop …` is rejected.** Expected: install from the
   app's Settings page instead.
@@ -225,7 +242,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 51 node:test cases
+npm test                      # 54 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py

@@ -35,7 +35,7 @@ plugins/dsh-session-naming/
 ├── lib/normalizer.js     # 自动规范化、类型推断、稳定窗口监听
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 51 项 node:test
+├── tests/                # 54 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -51,17 +51,27 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**51 项通过，0 失败**。覆盖：
+结果：**54 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
-- `normalizer.js`：规范标题识别、类型关键词顺序与兜底、码点安全截断、前缀剥离、
+- `normalizer.js`：规范标题识别、类型加权打分、纯疑问句/失败疑问句、码点安全截断、任意类型前缀剥离、
   分支拼装、字节预算、首条人类消息提取、`settleMs` 校验、各类跳过条件、追加事件
   形状、稳定窗口重置、dispose 清理定时器；
 - `title-tools.js`：工具注册/注销、人工标题 guard、`force`、分叉继承放行、
-  分支判定（`isSeeded` / `inheritedEventCount` / 投影缓存）、普通/分支/`raw`/`AUTO`
+  分支判定（`isSeeded` / `inheritedEventCount` / `origin: subagent` / 投影缓存）、普通/分支/`raw`/`AUTO`
   标题、截断报告、预算报错、网关调用参数、缺失网关与空参数错误；
 - `index.js`：配置默认值、未知键、类型错误、单半边启用、挂载与 dispose。
+
+### P0 优化（0.1.1）
+
+- 类型判定从“固定顺序首命中”改为加权打分：标题强信号 3、标题开头动作词 +2、
+  标题结尾交付物 +3、首条消息强信号 1；纯疑问句归 `查询`，失败疑问句归 `排障`。
+- 前缀剥离改为任意 `MMDD｜短类型｜`，覆盖词表外类型，`1020｜开发｜…` 不再把
+  日期/类型带进目标。
+- `isBranchSession` / `isInheritedForkTitle` 用 `header.origin === "subagent"` 排除
+  子代理，避免给 subagent 加 `Branch｜`。
+- 新增回归：8 条误判样例、未知类型前缀、subagent 分支；测试 51 → 54。
 
 ### 元数据校验
 
