@@ -116,11 +116,12 @@ npm test
   `合规 68（72%），不合规 26；分叉缺 Branch 0，分叉带 (n) 0，无效类型前缀 0，
   AUTO 缺序号 0，重复目标 0 组（另有 2 组父子/分叉同目标）`。
 
-### P2 客户端分叉徽标（0.4.0）
+### P2 客户端分叉徽标（0.4.0 / 0.4.2）
 
 - `lib/client.js` 在 `sidebar.session.row.leading` 注册 15px 分叉图标；条件是
   `parentSessionId` 存在且 `origin !== "subagent"`；只是视觉辅助，标题仍保留
   `Branch｜`。
+- 0.4.2 补上 `@deepseek-ai/dsh-client-ui-renderer` 依赖，与 primary-session 徽标一致。
 - 已做 mock 单测：谓词、seat 注册、locale、显示/隐藏；**尚未在真实 UI 视觉验证**。
 - client bundle 需要重启 App 后加载；Host 工具/规范化器不受影响。
 
@@ -193,10 +194,10 @@ profile。
 - 提交 `d818e7d`（0.1.0）、`e4b893a`（安装验证）、`507a21c`（0.1.1 P0）、
   `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）、`44adb41`（0.2.2
   序号清理）、`60d9725`（0.3.0 审计 + AUTO）、`5928e9a`（0.4.0 client 徽标）、
-  `0bbbb75`（0.4.1 审计分叉对）、`0.4.2`（client renderer 依赖）已推送到
-  `origin/main`。
-- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1–0.4.1 发布后
-  分别再次 `remove` → `add`；当前锁文件解析到 `0bbbb75`：
+  `0bbbb75`（0.4.1 审计分叉对）、`0190ba5`（0.4.2 client renderer 依赖）
+  已推送到 `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1–0.4.2 发布后
+  分别再次 `remove` → `add`；当前锁文件解析到 `0190ba5`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -206,15 +207,15 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.4.1`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `0bbbb75`。
+  结果：`+ dsh-session-naming 0.4.2`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `0190ba5`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
   `~/.dsh/backups/session-naming-legacy-20261020.tar.gz` 后删除；归档同时包含迁移前
   的 patch 备份。
 - 0.1.0–0.2.2 曾在运行中的 App 里连续热加载（`02:21:05`–`03:04:11`）。
-  0.3.0、0.4.0、0.4.1 安装后**没有**新的 `loaded` 行：运行中的 App 仍停留在
+  0.3.0、0.4.0、0.4.1、0.4.2 安装后**没有**新的 `loaded` 行：运行中的 App 仍停留在
   0.2.2，必须重启才会加载 `session_title_audit`、AUTO 收紧和 client 徽标。
   这是本轮唯一未完成的激活步骤。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
