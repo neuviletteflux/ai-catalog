@@ -15,7 +15,7 @@ Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.4.0` |
+| Version | `0.4.1` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -153,8 +153,8 @@ guess and reports that no prefix was added.
 `session_title_audit` is read-only. It scans the projection cache and reports
 the compliance rate, type distribution, forks missing `Branch｜`, forks still
 carrying `(n)`, invalid type prefixes, `AUTO` titles without a run index, and
-same-day/same-goal duplicates. It never writes a title, session log, or
-projection cache.
+same-day/same-goal duplicates (parent/fork pairs are reported separately from
+true duplicates). It never writes a title, session log, or projection cache.
 
 ### Fork badge (client half)
 
@@ -269,7 +269,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 71 node:test cases
+npm test                      # 72 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py

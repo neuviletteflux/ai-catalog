@@ -153,10 +153,21 @@ export function auditEntries(entries) {
     duplicateMap.set(duplicateKey, group)
   }
 
-  const duplicates = [...duplicateMap.entries()]
-    .filter(([, titles]) => titles.length > 1)
-    .map(([key, titles]) => ({ key, count: titles.length, titles: titles.slice(0, 5) }))
-    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+  const duplicates = []
+  const forkPairs = []
+  for (const [key, titles] of duplicateMap) {
+    if (titles.length < 2) continue
+    const branches = titles.filter((title) => title.startsWith('Branch｜'))
+    const parents = titles.filter((title) => !title.startsWith('Branch｜'))
+    // A parent and its fork sharing a goal is the normal shape, not a duplicate.
+    if (branches.length <= 1 && parents.length <= 1) {
+      forkPairs.push({ key, count: titles.length, titles: titles.slice(0, 5) })
+      continue
+    }
+    duplicates.push({ key, count: titles.length, titles: titles.slice(0, 5) })
+  }
+  duplicates.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+  forkPairs.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
   for (const item of duplicates) {
     example(examples.duplicateGoals, `${item.key} ×${item.count}`)
   }
@@ -167,7 +178,8 @@ export function auditEntries(entries) {
     : `扫描 ${top.length} 条顶层会话：合规 ${compliant}（${rate}%），不合规 ${noncompliant}；`
       + `分叉缺 Branch ${forksMissingBranch}，分叉带 (n) ${staleForkTitles}，`
       + `无效类型前缀 ${invalidTypePrefixes}，AUTO 缺序号 ${autoWithoutSeq}，`
-      + `重复目标 ${duplicates.length} 组。`
+      + `重复目标 ${duplicates.length} 组`
+      + (forkPairs.length === 0 ? '。' : `（另有 ${forkPairs.length} 组父子/分叉同目标）。`)
 
   return {
     scanned: entries.length,
@@ -182,8 +194,10 @@ export function auditEntries(entries) {
     unexpectedBranch,
     autoWithoutSeq,
     duplicateGroups: duplicates.length,
+    forkPairGroups: forkPairs.length,
     typeCounts,
     duplicates,
+    forkPairs,
     examples,
     message,
   }
@@ -217,8 +231,8 @@ export function sessionTitleAuditTool() {
         required: [
           'scanned', 'skippedSubagents', 'topLevel', 'compliant', 'noncompliant',
           'branchTitles', 'forksMissingBranch', 'staleForkTitles', 'invalidTypePrefixes',
-          'unexpectedBranch', 'autoWithoutSeq', 'duplicateGroups', 'typeCounts',
-          'duplicates', 'examples', 'message',
+          'unexpectedBranch', 'autoWithoutSeq', 'duplicateGroups', 'forkPairGroups',
+          'typeCounts', 'duplicates', 'forkPairs', 'examples', 'message',
         ],
         properties: {
           scanned: { type: 'integer' },
@@ -233,11 +247,25 @@ export function sessionTitleAuditTool() {
           unexpectedBranch: { type: 'integer' },
           autoWithoutSeq: { type: 'integer' },
           duplicateGroups: { type: 'integer' },
+          forkPairGroups: { type: 'integer' },
           typeCounts: {
             type: 'object',
             additionalProperties: { type: 'integer' },
           },
           duplicates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['key', 'count', 'titles'],
+              properties: {
+                key: { type: 'string' },
+                count: { type: 'integer' },
+                titles: { type: 'array', items: { type: 'string' } },
+              },
+            },
+          },
+          forkPairs: {
             type: 'array',
             items: {
               type: 'object',

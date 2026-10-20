@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1 — 2026-10-20
+
+- `session_title_audit` now separates a parent and its fork sharing the same
+  day/goal (`forkPairs`) from true duplicate groups, so the intentional
+  parent/branch shape no longer reads as a duplicate.
+- Tests 71 → 72.
+
 ## 0.4.0 — 2026-10-20
 
 - Add an optional client half (`./client`): a compact, aria-labeled fork icon

@@ -38,7 +38,7 @@ plugins/dsh-session-naming/
 ├── lib/client.js         # 浏览器半侧：Session 行分叉图标
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 71 项 node:test
+├── tests/                # 72 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -54,7 +54,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**71 项通过，0 失败**。覆盖：
+结果：**72 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
@@ -94,6 +94,7 @@ npm test
 - 0.3.0 新增只读 `session_title_audit`，并收紧 `AUTO`：必须带 `seq`，标题必须
   以 `-NN` 结尾；测试 62 → 69。
 - 0.4.0 新增可选 client 半侧：Session 行前的分叉图标；测试 69 → 71。
+- 0.4.1 审计把父子/分叉同目标与真正重复分开；测试 71 → 72。
   客户端 bundle 需要重启后加载，本轮无法在当前 App 内做视觉验证。
 - 0.2.1 修复 `rename_session`：直接调用 Host 的
   `sessionController.rename({ sessionId, title })`；旧的 `typertGateway.invoke`
@@ -122,7 +123,7 @@ cd plugins/dsh-session-naming
 npm pack --dry-run
 ```
 
-结果：17 个文件、29.6 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
+结果：17 个文件、29.9 kB tarball；包含 `lib/`、`cordis.patch.yml`、`locale/`、
 `assets/icon.svg`、两份 README、`CHANGELOG.md`、`LICENSE`、`plugin.yaml`、
 `package.json`；不包含 `tests/`。
 

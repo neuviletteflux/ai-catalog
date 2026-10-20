@@ -62,6 +62,8 @@ test('auditEntries counts compliance, forks, invalid prefixes, and duplicates', 
   assert.equal(result.unexpectedBranch, 0)
   assert.equal(result.autoWithoutSeq, 0)
   assert.equal(result.duplicateGroups, 1)
+  assert.equal(result.forkPairGroups, 0)
+  assert.deepEqual(result.forkPairs, [])
   assert.equal(result.duplicates[0].key, '0105｜主题')
   assert.equal(result.duplicates[0].count, 2)
   assert.deepEqual(
@@ -90,6 +92,17 @@ test('auditEntries flags AUTO without a run index', () => {
   assert.equal(result.compliant, 1)
   assert.equal(result.noncompliant, 1)
   assert.equal(result.autoWithoutSeq, 1)
+})
+
+test('auditEntries treats a parent and its fork as a pair, not a duplicate', () => {
+  const result = auditEntries([
+    { sessionId: 'p', title: '0105｜查询｜主题', isSeeded: false, inheritedEventCount: 0, subagent: false },
+    { sessionId: 'f', title: 'Branch｜0105｜查询｜主题', isSeeded: true, inheritedEventCount: 0, subagent: false },
+  ])
+  assert.equal(result.duplicateGroups, 0)
+  assert.equal(result.forkPairGroups, 1)
+  assert.equal(result.forkPairs[0].key, '0105｜主题')
+  assert.equal(result.forkPairs[0].count, 2)
 })
 
 test('session_title_audit is read-only and validates its limit', async () => {

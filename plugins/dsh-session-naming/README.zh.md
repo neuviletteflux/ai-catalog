@@ -14,7 +14,7 @@
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.4.0` |
+| 版本 | `0.4.1` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -144,7 +144,7 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 
 `session_title_audit` 是只读工具：扫描投影缓存，报告合规率、类型分布、分叉缺
 `Branch｜`、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日同目标
-重复。它不写标题、会话日志或投影缓存。
+重复（父子/分叉同目标单独计数，不算重复）。它不写标题、会话日志或投影缓存。
 
 ### 分叉徽标（客户端半侧）
 
@@ -242,7 +242,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 71 项 node:test
+npm test                      # 72 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py
