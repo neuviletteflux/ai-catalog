@@ -222,10 +222,10 @@ profile。
   `8b1abed`（0.2.0 P1a）、`438f8e6`（0.2.1 rename 修复）、`44adb41`（0.2.2
   序号清理）、`60d9725`（0.3.0 审计 + AUTO）、`5928e9a`（0.4.0 client 徽标）、
   `0bbbb75`（0.4.1 审计分叉对）、`0190ba5`（0.4.2 client renderer 依赖）、
-  `c6c4646`（0.4.3 schema 修复）、`8f7b658`（0.5.0 历史回填）
-  已推送到 `origin/main`。
-- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1–0.5.0 发布后
-  分别再次 `remove` → `add`；当前锁文件解析到 `8f7b658`：
+  `c6c4646`（0.4.3 schema 修复）、`8f7b658`（0.5.0 历史回填）、`62e1d3e`
+  （0.6.0 badge-only）已推送到 `origin/main`。
+- 首次从 GitHub 安装 0.1.0 后，按要求卸载并清理旧插件；0.1.1–0.6.0 发布后
+  分别再次 `remove` → `add`；当前锁文件解析到 `62e1d3e`：
 
   ```bash
   '/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh' \
@@ -235,8 +235,8 @@ profile。
     'github:neuviletteflux/ai-catalog#path:/plugins/dsh-session-naming'
   ```
 
-  结果：`+ dsh-session-naming 0.5.0`；profile `package.json` 的 dependencies 与
-  `dsh.profile.bundles` 均包含该包；锁文件指向 `8f7b658`。
+  结果：`+ dsh-session-naming 0.6.0`；profile `package.json` 的 dependencies 与
+  `dsh.profile.bundles` 均包含该包；锁文件指向 `62e1d3e`。
 - `~/.dsh/cordis.patch.yml` 中两段旧 insert 及迁移说明都已删除；YAML 解析通过，
   全文 0 处 `session-naming`。
 - 旧插件目录 `~/.dsh/plugins/session-naming/` 已归档到
@@ -245,7 +245,7 @@ profile。
 - 0.1.0–0.2.2 曾在运行中的 App 里连续热加载（`02:21:05`–`03:04:11`）。
   0.3.0–0.4.2 没有新的 `loaded` 行；根因是 0.4.2 的审计 schema 让 host 插件注册
   失败，不是版本替换本身。0.4.3 修复后，alpha web 重启 0.5.0 已在
-  `05:41:14.211Z` 正常 `loaded`。desktop 已装 0.5.0，但运行中的 App 仍无插件，
+  `05:41:14.211Z` 正常 `loaded`。desktop 已装 0.6.0，但运行中的 App 仍加载 0.5.0，
   必须重启一次；重启后工具应为 `set_session_title`、`rename_session`、
   `session_title_audit`、`session_title_backfill` 四个。
 - 热加载后用 0.1.1 的 `set_session_title` 实测：标题设为
@@ -261,8 +261,9 @@ profile。
 
 ## 未验证 / 限制
 
-- **desktop 已加载 0.5.0**：四个工具与历史回填均验证通过；AUTO 收紧已生效。
-  仍需观察重启后的 client 分叉徽标。
+- **desktop 已装 0.6.0，尚待重启加载**：0.5.0 曾正常加载四个工具并完成历史回填；
+  0.6.0 的 host 代码已通过 77 项测试和安装目录 `apply()` 冒烟（四个工具），但当前
+  App 仍是 0.5.0 进程，重启后才会切到 badge-only 约定。client 分叉徽标仍待视觉确认。
 - **P2 真实 UI 未视觉验证**：`lib/client.js` 只做了 mock 单测；分叉图标在真实
   侧边栏的排版、与主会话徽标共存、深浅色主题均未查看。
 - **未验证真实 GUI 的插件卡片**：locale 标题/描述与图标已通过静态校验，但设置页
