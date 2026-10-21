@@ -30,16 +30,17 @@ async function writeSession(id, {
 }
 
 await writeSession('s1', { title: '0105｜查询｜主题' })
-await writeSession('s2', { title: 'Branch｜0105｜审计｜审计目标', isSeeded: true })
+await writeSession('s2', { title: '0105｜审计｜审计目标', isSeeded: true })
 await writeSession('s3', { title: '0105｜规划｜规划目标 (1)', isSeeded: true })
 await writeSession('s4', { title: '0105｜开发｜主题' })
 await writeSession('s5', { title: '随便聊聊' })
 await writeSession('s6', { title: '任务', subagent: true })
 await writeSession('s7', { title: '0105｜分析｜主题' })
+await writeSession('s8', { title: 'Branch｜0105｜查询｜旧目标' })
 
 test('scanProjectionEntries reads titles and marks subagents and forks', () => {
   const entries = scanProjectionEntries(home, 100)
-  assert.equal(entries.length, 7)
+  assert.equal(entries.length, 8)
   const byId = new Map(entries.map((entry) => [entry.sessionId, entry]))
   assert.equal(byId.get('s2').isSeeded, true)
   assert.equal(byId.get('s6').subagent, true)
@@ -50,16 +51,14 @@ test('scanProjectionEntries reads titles and marks subagents and forks', () => {
 
 test('auditEntries counts compliance, forks, invalid prefixes, and duplicates', () => {
   const result = auditEntries(scanProjectionEntries(home, 100))
-  assert.equal(result.scanned, 7)
+  assert.equal(result.scanned, 8)
   assert.equal(result.skippedSubagents, 1)
-  assert.equal(result.topLevel, 6)
+  assert.equal(result.topLevel, 7)
   assert.equal(result.compliant, 3)
-  assert.equal(result.noncompliant, 3)
-  assert.equal(result.branchTitles, 1)
-  assert.equal(result.forksMissingBranch, 1)
+  assert.equal(result.noncompliant, 4)
+  assert.equal(result.legacyBranchTitles, 1)
   assert.equal(result.staleForkTitles, 1)
   assert.equal(result.invalidTypePrefixes, 1)
-  assert.equal(result.unexpectedBranch, 0)
   assert.equal(result.autoWithoutSeq, 0)
   assert.equal(result.duplicateGroups, 1)
   assert.equal(result.forkPairGroups, 0)
@@ -70,17 +69,18 @@ test('auditEntries counts compliance, forks, invalid prefixes, and duplicates', 
     [...result.duplicates[0].titles].sort(),
     ['0105｜分析｜主题', '0105｜查询｜主题'].sort(),
   )
-  assert.equal(result.typeCounts['查询'], 1)
+  assert.equal(result.typeCounts['查询'], 2)
   assert.equal(result.typeCounts['审计'], 1)
   assert.equal(result.typeCounts['分析'], 1)
   assert.equal(result.typeCounts['规划'], 1)
   assert.equal(result.typeCounts['AUTO'], 0)
-  assert.equal(result.examples.noncompliant.length, 3)
-  assert.equal(result.examples.forksMissingBranch.length, 1)
+  assert.equal(result.examples.noncompliant.length, 4)
+  assert.equal(result.examples.legacyBranch.length, 1)
   assert.equal(result.examples.invalidType.length, 1)
   assert.equal(result.examples.duplicateGoals.length, 1)
-  assert.match(result.message, /6 条顶层会话/u)
+  assert.match(result.message, /7 条顶层会话/u)
   assert.match(result.message, /合规 3/u)
+  assert.match(result.message, /遗留 Branch 前缀 1/u)
 })
 
 test('auditEntries flags AUTO without a run index', () => {
@@ -97,7 +97,7 @@ test('auditEntries flags AUTO without a run index', () => {
 test('auditEntries treats a parent and its fork as a pair, not a duplicate', () => {
   const result = auditEntries([
     { sessionId: 'p', title: '0105｜查询｜主题', isSeeded: false, inheritedEventCount: 0, subagent: false },
-    { sessionId: 'f', title: 'Branch｜0105｜查询｜主题', isSeeded: true, inheritedEventCount: 0, subagent: false },
+    { sessionId: 'f', title: '0105｜查询｜主题', isSeeded: true, inheritedEventCount: 0, subagent: false },
   ])
   assert.equal(result.duplicateGroups, 0)
   assert.equal(result.forkPairGroups, 1)
@@ -127,8 +127,8 @@ test('session_title_audit is read-only and validates its limit', async () => {
   const tool = sessionTitleAuditTool()
   assert.equal(tool.name, 'session_title_audit')
   const result = await tool.execute({ limit: 100 })
-  assert.equal(result.topLevel, 6)
-  assert.match(result.message, /分叉缺 Branch 1/u)
+  assert.equal(result.topLevel, 7)
+  assert.match(result.message, /遗留 Branch 前缀 1/u)
   assert.throws(() => tool.execute({ limit: 0 }), /limit 必须是/u)
   assert.throws(() => tool.execute({ limit: 1001 }), /limit 必须是/u)
 })

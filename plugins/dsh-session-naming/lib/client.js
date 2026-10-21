@@ -3,9 +3,9 @@
  *
  * Adds one optional leading-seat badge to a Session row when its
  * `SessionSummary` carries a `parentSessionId` and is not a subagent. The
- * visual marks a fork without changing the title; the `Branch｜` title prefix
- * remains the durable convention. The badge is aria-labeled and does not
- * intercept row clicks.
+ * visual is the only fork marker in the title row: the title itself stays
+ * `MMDD｜type｜goal` for both parents and forks. The badge is aria-labeled and
+ * does not intercept row clicks.
  *
  * The client module is a separate bundle: replacing an installed package
  * requires an app restart to load a fresh generation. A failure here cannot

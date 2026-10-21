@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  DEFAULT_MAX_TITLE_BYTES, TYPES, branchPrefix, composeTitle, ensureBranchPrefix,
-  hasBranchPrefix, monthDayOf, normalizeGoal, normalizeSeq, normalizeType, oneLine, utf8Bytes,
+  DEFAULT_MAX_TITLE_BYTES, TYPES, composeTitle, monthDayOf, normalizeGoal,
+  normalizeSeq, normalizeType, oneLine, stripLegacyBranchPrefix, utf8Bytes,
 } from '../lib/compose.js'
 
 const createdAt = new Date(2026, 0, 5, 12, 0, 0).getTime()
@@ -51,13 +51,10 @@ test('normalizeSeq accepts 1-99 only', () => {
   }
 })
 
-test('branch prefix helpers never duplicate the label', () => {
-  assert.equal(branchPrefix(), 'Branch｜')
-  assert.equal(ensureBranchPrefix('0105｜查询｜主题', true), 'Branch｜0105｜查询｜主题')
-  assert.equal(ensureBranchPrefix('Branch｜0105｜查询｜主题', true), 'Branch｜0105｜查询｜主题')
-  assert.equal(ensureBranchPrefix('0105｜查询｜主题', false), '0105｜查询｜主题')
-  assert.equal(hasBranchPrefix('Branch｜0105｜查询｜主题'), true)
-  assert.equal(hasBranchPrefix('0105｜查询｜主题'), false)
+test('stripLegacyBranchPrefix removes only the old prefix', () => {
+  assert.equal(stripLegacyBranchPrefix('Branch｜0105｜查询｜主题'), '0105｜查询｜主题')
+  assert.equal(stripLegacyBranchPrefix('0105｜查询｜主题'), '0105｜查询｜主题')
+  assert.equal(stripLegacyBranchPrefix('  Branch｜自定义  '), '自定义')
 })
 
 test('composeTitle builds the ordinary title from the creation date', () => {
@@ -66,10 +63,10 @@ test('composeTitle builds the ordinary title from the creation date', () => {
   assert.equal(utf8Bytes(title) <= 80, true)
 })
 
-test('composeTitle adds the branch prefix when requested', () => {
+test('composeTitle never adds a Branch prefix', () => {
   assert.equal(
     composeTitle({ type: '实施', goal: '迁移插件', branch: true }, createdAt, 80),
-    'Branch｜0105｜实施｜迁移插件',
+    '0105｜实施｜迁移插件',
   )
 })
 

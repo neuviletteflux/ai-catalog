@@ -174,14 +174,14 @@ test('set_session_title composes the ordinary title and reports byte evidence', 
   assert.match(result.message, /已将会话标题设为/u)
 })
 
-test('set_session_title adds the branch prefix automatically', async () => {
+test('set_session_title never adds a Branch prefix', async () => {
   const service = makeService()
   const tool = setSessionTitleTool(makeCtx(service))
   const session = makeSession({ isSeeded: true })
   const result = await tool.execute({ type: '实施', goal: '迁移插件' }, execFor(session))
-  assert.equal(result.title, 'Branch｜0105｜实施｜迁移插件')
+  assert.equal(result.title, '0105｜实施｜迁移插件')
   assert.equal(result.branch, true)
-  assert.match(result.message, /分支会话已加 Branch｜ 前缀/u)
+  assert.match(result.message, /分叉由界面徽标标识/u)
 })
 
 test('set_session_title does not prefix subagent sessions', async () => {
@@ -193,12 +193,12 @@ test('set_session_title does not prefix subagent sessions', async () => {
   assert.equal(result.branch, false)
 })
 
-test('set_session_title accepts raw titles and appends the branch prefix', async () => {
+test('set_session_title strips a legacy Branch prefix from raw titles', async () => {
   const service = makeService()
   const tool = setSessionTitleTool(makeCtx(service))
   const session = makeSession({ isSeeded: true })
-  const result = await tool.execute({ raw: '  自定义标题  ' }, execFor(session))
-  assert.equal(result.title, 'Branch｜自定义标题')
+  const result = await tool.execute({ raw: '  Branch｜自定义标题  ' }, execFor(session))
+  assert.equal(result.title, '自定义标题')
 })
 
 test('set_session_title appends the automation run index', async () => {
@@ -249,7 +249,7 @@ test('set_session_title rejects a goal over the byte budget before renaming', as
   assert.equal(service.calls.rename.length, 0)
 })
 
-test('rename_session uses the session controller and derives the branch prefix from the cache', async () => {
+test('rename_session uses the session controller and never adds a Branch prefix', async () => {
   await writeProjection('session-branch', { identity: { isSeeded: true } })
   const calls = []
   const controller = {
@@ -263,12 +263,12 @@ test('rename_session uses the session controller and derives the branch prefix f
     { sessionId: 'session-branch', title: '1016｜实施｜存量整理' },
     { signal: 'signal' },
   )
-  assert.equal(result.title, 'Branch｜1016｜实施｜存量整理')
+  assert.equal(result.title, '1016｜实施｜存量整理')
   assert.equal(result.branch, true)
   assert.equal(result.seq, 7)
   assert.deepEqual(calls[0], {
     sessionId: 'session-branch',
-    title: 'Branch｜1016｜实施｜存量整理',
+    title: '1016｜实施｜存量整理',
   })
 })
 
@@ -280,8 +280,20 @@ test('rename_session strips a trailing (n) from a fork title', async () => {
     sessionId: 'session-fork-n',
     title: '1016｜规划｜重构控制台页面方案 (1)',
   })
-  assert.equal(result.title, 'Branch｜1016｜规划｜重构控制台页面方案')
+  assert.equal(result.title, '1016｜规划｜重构控制台页面方案')
   assert.match(result.message, /已去掉末尾的 \(n\)/u)
+})
+
+test('rename_session strips a legacy Branch prefix', async () => {
+  await writeProjection('session-legacy', { identity: { isSeeded: true } })
+  const controller = { rename: async (request) => ({ title: request.title }) }
+  const tool = renameSessionTool(makeCtx(makeService(), { controller }))
+  const result = await tool.execute({
+    sessionId: 'session-legacy',
+    title: 'Branch｜1016｜实施｜存量整理',
+  })
+  assert.equal(result.title, '1016｜实施｜存量整理')
+  assert.match(result.message, /已去掉旧的 Branch｜ 前缀/u)
 })
 
 test('rename_session lets an explicit branch flag override the cache', async () => {

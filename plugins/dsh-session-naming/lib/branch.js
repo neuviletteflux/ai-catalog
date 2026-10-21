@@ -87,8 +87,8 @@ export function isInheritedForkTitle(session, previous) {
  * Whether the session is a branch (fork).
  *
  * Subagents also carry `isSeeded`/`inheritedEventCount`, so
- * `header.origin === "subagent"` wins first; only non-subagent sessions with
- * fork evidence get the `Branch｜` prefix.
+ * `header.origin === "subagent"` wins first; non-subagent sessions with fork
+ * evidence are marked by the sidebar badge, not by a title prefix.
  */
 export function isBranchSession(session) {
   const header = session?.header

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — 2026-10-21
+
+- Fork marking becomes **badge-only**: titles are `MMDD｜类型｜目标` for both
+  parents and forks. The sidebar leading-seat icon is the only fork marker.
+- Remove the `Branch｜` prefix from composition, tools, normalizer, audit, and
+  backfill output; accept and strip legacy `Branch｜` prefixes during migration.
+- Migrate the 4 existing fork titles; audit no longer requires a Branch prefix
+  and reports legacy prefixes separately.
+- 9 bytes per fork title are returned to the 80-byte goal budget.
+- Tests 76 → 77 (legacy stripping and badge-only expectations).
+
 ## 0.5.0 — 2026-10-20
 
 - Add `session_title_backfill`: dry-run by default; scans non-compliant

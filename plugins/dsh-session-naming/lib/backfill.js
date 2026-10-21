@@ -26,8 +26,7 @@ const TITLE_SHAPE = /^(?:Branch｜)?\d{4}｜([^｜|]{1,16})｜/u
 function isCanonical(title, branch) {
   if (!isConventionTitle(title)) return false
   const text = oneLine(title)
-  if (branch) return text.startsWith('Branch｜') && forkTitleBase(text) === text
-  return !text.startsWith('Branch｜')
+  return !branch || forkTitleBase(text) === text
 }
 
 /**
@@ -94,7 +93,8 @@ export function sessionTitleBackfillTool(ctx) {
     name: 'session_title_backfill',
     description: [
       '批量规范化历史会话标题。只处理不合规的顶层会话；现标题保留为目标文本，',
-      '按创建日期补 MMDD、按标题推断类型、fork 补 Branch｜并去掉末尾 (n)，',
+      '按创建日期补 MMDD、按标题推断类型、去掉末尾 (n)；fork 由界面徽标标识，',
+      '标题不加 Branch；旧的 Branch｜ 前缀会被去掉。',
       '子代理、已合规标题和缺 createdAt 的会话跳过。默认 apply=false，只返回',
       '建议列表；apply=true 才通过 sessionController.rename 写入。',
     ].join(''),

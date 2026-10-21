@@ -91,29 +91,22 @@ export function auditEntries(entries) {
   const duplicateMap = new Map()
   const examples = {
     noncompliant: [],
-    forksMissingBranch: [],
+    legacyBranch: [],
     invalidType: [],
     duplicateGoals: [],
   }
   let compliant = 0
   let noncompliant = 0
-  let branchTitles = 0
-  let forksMissingBranch = 0
+  let legacyBranchTitles = 0
   let staleForkTitles = 0
   let invalidTypePrefixes = 0
-  let unexpectedBranch = 0
   let autoWithoutSeq = 0
 
   for (const entry of top) {
     const matched = TITLE_SHAPE.exec(entry.title)
     const fork = entry.isSeeded || entry.inheritedEventCount > 0
-    const branch = matched?.[1] !== undefined
-    if (branch) branchTitles += 1
-    if (!fork && branch) unexpectedBranch += 1
-    if (fork && !branch) {
-      forksMissingBranch += 1
-      example(examples.forksMissingBranch, `${entry.sessionId}: ${entry.title}`)
-    }
+    const legacyBranch = matched?.[1] !== undefined
+    if (legacyBranch) legacyBranchTitles += 1
     if (fork && forkTitleBase(entry.title) !== entry.title) staleForkTitles += 1
 
     if (matched === null) {
@@ -139,32 +132,40 @@ export function auditEntries(entries) {
       continue
     }
 
-    const forkCompliant = !fork || (branch && forkTitleBase(entry.title) === entry.title)
+    const duplicateKey = `${mmdd}｜${forkTitleBase(goal)}`
+    const group = duplicateMap.get(duplicateKey) ?? []
+    group.push({ title: entry.title, fork })
+    duplicateMap.set(duplicateKey, group)
+
+    if (legacyBranch) {
+      noncompliant += 1
+      example(examples.legacyBranch, `${entry.sessionId}: ${entry.title}`)
+      example(examples.noncompliant, `${entry.sessionId}: ${entry.title}`)
+      continue
+    }
+
+    const forkCompliant = !fork || forkTitleBase(entry.title) === entry.title
     if (forkCompliant && isConventionTitle(entry.title)) {
       compliant += 1
     } else {
       noncompliant += 1
       example(examples.noncompliant, `${entry.sessionId}: ${entry.title}`)
     }
-
-    const duplicateKey = `${mmdd}｜${forkTitleBase(goal)}`
-    const group = duplicateMap.get(duplicateKey) ?? []
-    group.push(entry.title)
-    duplicateMap.set(duplicateKey, group)
   }
 
   const duplicates = []
   const forkPairs = []
-  for (const [key, titles] of duplicateMap) {
-    if (titles.length < 2) continue
-    const branches = titles.filter((title) => title.startsWith('Branch｜'))
-    const parents = titles.filter((title) => !title.startsWith('Branch｜'))
+  for (const [key, group] of duplicateMap) {
+    if (group.length < 2) continue
+    const forks = group.filter((item) => item.fork).length
+    const parents = group.length - forks
+    const titles = group.map((item) => item.title).slice(0, 5)
     // A parent and its fork sharing a goal is the normal shape, not a duplicate.
-    if (branches.length <= 1 && parents.length <= 1) {
-      forkPairs.push({ key, count: titles.length, titles: titles.slice(0, 5) })
+    if (forks <= 1 && parents <= 1) {
+      forkPairs.push({ key, count: group.length, titles })
       continue
     }
-    duplicates.push({ key, count: titles.length, titles: titles.slice(0, 5) })
+    duplicates.push({ key, count: group.length, titles })
   }
   duplicates.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
   forkPairs.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
@@ -176,7 +177,7 @@ export function auditEntries(entries) {
   const message = top.length === 0
     ? '未找到可审计的顶层会话（检查 DSH_HOME 与投影缓存）'
     : `扫描 ${top.length} 条顶层会话：合规 ${compliant}（${rate}%），不合规 ${noncompliant}；`
-      + `分叉缺 Branch ${forksMissingBranch}，分叉带 (n) ${staleForkTitles}，`
+      + `遗留 Branch 前缀 ${legacyBranchTitles}，分叉带 (n) ${staleForkTitles}，`
       + `无效类型前缀 ${invalidTypePrefixes}，AUTO 缺序号 ${autoWithoutSeq}，`
       + `重复目标 ${duplicates.length} 组`
       + (forkPairs.length === 0 ? '。' : `（另有 ${forkPairs.length} 组父子/分叉同目标）。`)
@@ -187,11 +188,9 @@ export function auditEntries(entries) {
     topLevel: top.length,
     compliant,
     noncompliant,
-    branchTitles,
-    forksMissingBranch,
+    legacyBranchTitles,
     staleForkTitles,
     invalidTypePrefixes,
-    unexpectedBranch,
     autoWithoutSeq,
     duplicateGroups: duplicates.length,
     forkPairGroups: forkPairs.length,
@@ -208,7 +207,7 @@ export function sessionTitleAuditTool() {
   return {
     name: 'session_title_audit',
     description: [
-      '只读审计会话标题规范：扫描投影缓存，统计合规率、类型分布、分叉缺 Branch｜、',
+      '只读审计会话标题规范：扫描投影缓存，统计合规率、类型分布、遗留 Branch｜ 前缀、',
       '分叉残留 (n)、无效类型前缀、AUTO 缺序号和同日同目标重复。不修改任何标题、',
       '不写会话日志或投影缓存。可选 limit 控制扫描条数（默认 200，最大 1000）。',
     ].join(''),
@@ -230,8 +229,8 @@ export function sessionTitleAuditTool() {
         additionalProperties: false,
         required: [
           'scanned', 'skippedSubagents', 'topLevel', 'compliant', 'noncompliant',
-          'branchTitles', 'forksMissingBranch', 'staleForkTitles', 'invalidTypePrefixes',
-          'unexpectedBranch', 'autoWithoutSeq', 'duplicateGroups', 'forkPairGroups',
+          'legacyBranchTitles', 'staleForkTitles', 'invalidTypePrefixes',
+          'autoWithoutSeq', 'duplicateGroups', 'forkPairGroups',
           'typeCounts', 'duplicates', 'forkPairs', 'examples', 'message',
         ],
         properties: {
@@ -240,11 +239,9 @@ export function sessionTitleAuditTool() {
           topLevel: { type: 'integer' },
           compliant: { type: 'integer' },
           noncompliant: { type: 'integer' },
-          branchTitles: { type: 'integer' },
-          forksMissingBranch: { type: 'integer' },
+          legacyBranchTitles: { type: 'integer' },
           staleForkTitles: { type: 'integer' },
           invalidTypePrefixes: { type: 'integer' },
-          unexpectedBranch: { type: 'integer' },
           autoWithoutSeq: { type: 'integer' },
           duplicateGroups: { type: 'integer' },
           forkPairGroups: { type: 'integer' },
@@ -283,10 +280,10 @@ export function sessionTitleAuditTool() {
           examples: {
             type: 'object',
             additionalProperties: false,
-            required: ['noncompliant', 'forksMissingBranch', 'invalidType', 'duplicateGoals'],
+            required: ['noncompliant', 'legacyBranch', 'invalidType', 'duplicateGoals'],
             properties: {
               noncompliant: { type: 'array', items: { type: 'string' } },
-              forksMissingBranch: { type: 'array', items: { type: 'string' } },
+              legacyBranch: { type: 'array', items: { type: 'string' } },
               invalidType: { type: 'array', items: { type: 'string' } },
               duplicateGoals: { type: 'array', items: { type: 'string' } },
             },

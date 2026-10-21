@@ -22,13 +22,14 @@ function entry(overrides) {
   }
 }
 
-test('proposeBackfill keeps the title as goal and fixes date, type, and branch', () => {
+test('proposeBackfill keeps the title as goal and never adds Branch', () => {
   const plan = proposeBackfill([
     entry({ sessionId: 'raw', title: '盘点 skills' }),
     entry({ sessionId: 'fork', title: '0105｜规划｜主题 (1)', isSeeded: true }),
     entry({ sessionId: 'ok', title: '0105｜查询｜主题' }),
     entry({ sessionId: 'sub', title: '任务', subagent: true }),
     entry({ sessionId: 'bad-type', title: '0105｜开发｜主题' }),
+    entry({ sessionId: 'legacy', title: 'Branch｜0105｜审计｜主题' }),
     entry({ sessionId: 'auto', title: '0105｜AUTO｜每日巡检' }),
     entry({ sessionId: 'no-date', title: '无日期', createdAt: undefined }),
   ])
@@ -38,9 +39,10 @@ test('proposeBackfill keeps the title as goal and fixes date, type, and branch',
   assert.equal(byId.has('auto'), false)
   assert.equal(byId.has('no-date'), false)
   assert.equal(byId.get('raw').proposedTitle, `0105｜${pickType('盘点 skills')}｜盘点 skills`)
-  assert.equal(byId.get('fork').proposedTitle, 'Branch｜0105｜规划｜主题')
+  assert.equal(byId.get('fork').proposedTitle, '0105｜规划｜主题')
   assert.equal(byId.get('fork').branch, true)
   assert.equal(byId.get('bad-type').proposedTitle, `0105｜${pickType('主题')}｜主题`)
+  assert.equal(byId.get('legacy').proposedTitle, '0105｜审计｜主题')
   assert.equal(plan.skipped.length, 2)
   assert.match(plan.skipped.find((item) => item.sessionId === 'auto').reason, /AUTO/u)
   assert.match(plan.skipped.find((item) => item.sessionId === 'no-date').reason, /createdAt/u)

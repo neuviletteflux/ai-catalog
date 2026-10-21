@@ -1,7 +1,7 @@
 {
   "name": "dsh-session-naming",
-  "version": "0.5.0",
-  "description": "DSH session-naming plugin: title tools, read-only audit, bulk backfill, automatic normalization to [Branch｜]MMDD｜type｜goal, and an optional sidebar fork badge.",
+  "version": "0.6.0",
+  "description": "DSH session-naming plugin: title tools, read-only audit, bulk backfill, automatic normalization to MMDD｜type｜goal, and an optional sidebar fork badge (the only fork marker).",
   "icon": "assets/icon.svg",
   "type": "module",
   "main": "lib/index.js",

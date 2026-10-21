@@ -1,7 +1,8 @@
 /**
  * dsh-session-naming / normalizer.js
  *
- * Rewrites the built-in summary title into `[Branch｜]MMDD｜type｜goal`.
+ * Rewrites the built-in summary title into `MMDD｜type｜goal` (forks are
+ * marked by the sidebar badge, not by a title prefix).
  *
  * Design constraint: DSH ships different `@deepseek-ai/dsh-session-title-llm`
  * provider interfaces across releases, so replacing the provider couples the
@@ -16,7 +17,7 @@ import { appendFile, mkdir, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
-  DEFAULT_MAX_TITLE_BYTES, SEPARATOR, TYPES, hasBranchPrefix, monthDayOf, oneLine, utf8Bytes,
+  DEFAULT_MAX_TITLE_BYTES, SEPARATOR, TYPES, monthDayOf, oneLine, utf8Bytes,
 } from './compose.js'
 import { forkTitleBase, isBranchSession, isInheritedForkTitle } from './branch.js'
 
@@ -26,8 +27,8 @@ export const PROVIDER_ID = 'session-naming-convention'
 /** Types the normalizer may infer. `AUTO` belongs to automation runs only. */
 export const GOAL_TYPES = TYPES.filter((type) => type !== 'AUTO')
 
-/** Shape of a compliant title: `[Branch｜]MMDD｜type｜goal`. */
-export const CONVENTION = /^(?:Branch｜)?\d{4}｜(?:分析|规划|实施|排障|审计|查询|整理|复盘|AUTO)｜/u
+/** Shape of a compliant title: `MMDD｜type｜goal`. */
+export const CONVENTION = /^\d{4}｜(?:分析|规划|实施|排障|审计|查询|整理|复盘|AUTO)｜/u
 
 /**
  * Any convention-shaped prefix, including a type outside the vocabulary.
@@ -174,7 +175,7 @@ export function isConventionTitle(title) {
   if (typeof title !== 'string') return false
   const text = oneLine(title)
   if (!CONVENTION.test(text)) return false
-  const matched = /^(?:Branch｜)?\d{4}｜([^｜]+)｜/u.exec(text)
+  const matched = /^\d{4}｜([^｜]+)｜/u.exec(text)
   if (matched?.[1] === 'AUTO' && !/-\d{2}$/u.test(text)) return false
   return true
 }
@@ -225,12 +226,13 @@ export function pickType(title, firstMessage = '') {
 
 /**
  * Compose a normalized title; shrink the goal instead of throwing when the
- * built-in summary is too long.
- * @param input - `{ goal, type, createdAt, maxBytes, branch }`.
+ * built-in summary is too long. A legacy `Branch｜` prefix is stripped, not
+ * regenerated.
+ * @param input - `{ goal, type, createdAt, maxBytes }`.
  */
 export function composeNormalized(input) {
   const type = GOAL_TYPES.includes(input?.type) ? input.type : DEFAULT_TYPE
-  const head = `${input?.branch === true ? 'Branch｜' : ''}${monthDayOf(input?.createdAt)}${SEPARATOR}${type}${SEPARATOR}`
+  const head = `${monthDayOf(input?.createdAt)}${SEPARATOR}${type}${SEPARATOR}`
   const maxBytes = Number.isInteger(input?.maxBytes) ? input.maxBytes : DEFAULT_MAX_TITLE_BYTES
   const room = maxBytes - utf8Bytes(head)
   if (room < 3) throw new Error(`session-naming-normalizer: 字节预算 ${maxBytes} 放不下 "${head}"`)
@@ -304,10 +306,10 @@ export function settleDelayOf(config) {
   return value
 }
 
-/** A fork title is compliant only with a Branch prefix and no trailing `(n)`. */
+/** A fork title is compliant with no trailing `(n)`; the badge marks the fork. */
 function isForkTitleCompliant(title) {
   const text = oneLine(title)
-  return isConventionTitle(text) && hasBranchPrefix(text) && forkTitleBase(text) === text
+  return isConventionTitle(text) && forkTitleBase(text) === text
 }
 
 /**
@@ -331,7 +333,7 @@ export function normalizeNow(ctx, session, options = {}) {
   const fork = isBranchSession(session)
   if (fork) {
     // Only the system-written inherited title may be replaced; a human rename on
-    // the fork must survive, and a title that already carries Branch｜ is done.
+    // the fork must survive; a title without a trailing (n) is done.
     if (!isInheritedForkTitle(session, current)) return undefined
     if (isForkTitleCompliant(current.title)) return undefined
   } else {
@@ -353,7 +355,6 @@ export function normalizeNow(ctx, session, options = {}) {
     type: pickType(goal, firstHumanText(session)),
     createdAt: header.createdAt,
     maxBytes,
-    branch: fork,
   })
   if (title === oneLine(current.title)) return undefined
   session.append('session/title', {

@@ -58,9 +58,9 @@ test('PROVIDER_ID and vocabulary are stable', () => {
   assert.equal(CONVENTION.test('0105｜查询｜主题'), true)
 })
 
-test('isConventionTitle accepts ordinary and branch titles only', () => {
+test('isConventionTitle accepts ordinary titles only', () => {
   assert.equal(isConventionTitle('0105｜查询｜主题'), true)
-  assert.equal(isConventionTitle('Branch｜0105｜实施｜主题'), true)
+  assert.equal(isConventionTitle('Branch｜0105｜实施｜主题'), false)
   assert.equal(isConventionTitle('1016｜AUTO｜每日巡检-01'), true)
   assert.equal(isConventionTitle('Session naming skills 实现'), false)
   assert.equal(isConventionTitle(' 0105｜查询｜主题 '), true)
@@ -109,7 +109,7 @@ test('pickType weights title actions above prompt question words', () => {
 
 test('isConventionTitle requires a run index for AUTO', () => {
   assert.equal(isConventionTitle('0105｜AUTO｜每日巡检-01'), true)
-  assert.equal(isConventionTitle('Branch｜0105｜AUTO｜每日巡检-02'), true)
+  assert.equal(isConventionTitle('Branch｜0105｜AUTO｜每日巡检-02'), false)
   assert.equal(isConventionTitle('0105｜AUTO｜每日巡检'), false)
 })
 
@@ -134,14 +134,14 @@ test('composeNormalized strips an existing convention prefix', () => {
   )
 })
 
-test('composeNormalized replaces inner separators and supports branches', () => {
+test('composeNormalized replaces inner separators and never adds a branch prefix', () => {
   assert.equal(
     composeNormalized({ goal: 'A｜B|C', type: '分析', createdAt, maxBytes: 80 }),
     '0105｜分析｜A B C',
   )
   assert.equal(
     composeNormalized({ goal: '主题', type: '分析', createdAt, maxBytes: 80, branch: true }),
-    'Branch｜0105｜分析｜主题',
+    '0105｜分析｜主题',
   )
 })
 
@@ -294,7 +294,7 @@ test('normalizeNow honours the service byte budget', () => {
   assert.equal(appends.length, 1)
 })
 
-test('normalizeNow rewrites an inherited fork title with Branch and strips (n)', () => {
+test('normalizeNow rewrites an inherited fork title and strips (n)', () => {
   const { session, appends } = fakeSession({
     parentSession: 'fork-parent',
     isSeeded: true,
@@ -307,7 +307,7 @@ test('normalizeNow rewrites an inherited fork title with Branch and strips (n)',
     sessionTitle: fakeService({ title: '父标题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
   }
   const title = normalizeNow(ctx, session, { log: () => {} })
-  assert.equal(title, 'Branch｜0105｜分析｜父标题')
+  assert.equal(title, '0105｜分析｜父标题')
   assert.equal(appends.length, 1)
   assert.deepEqual(appends[0].data.messageSeqs, [9])
   assert.deepEqual(appends[0].data.source, { kind: 'provider', provider: PROVIDER_ID })
@@ -326,7 +326,7 @@ test('normalizeNow keeps the type of a convention-shaped fork title', async () =
   const ctx = {
     sessionTitle: fakeService({ title: '0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
   }
-  assert.equal(normalizeNow(ctx, session, { log: () => {} }), 'Branch｜0105｜查询｜主题')
+  assert.equal(normalizeNow(ctx, session, { log: () => {} }), '0105｜查询｜主题')
   assert.deepEqual(appends[0].data.messageSeqs, [9])
 })
 
@@ -381,11 +381,11 @@ test('normalizeNow skips a compliant fork title but strips a stale (n)', () => {
     isSeeded: true,
     events: [
       { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '主题' }] } },
-      { type: 'session/title', seq: 20, data: { title: 'Branch｜0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] } },
+      { type: 'session/title', seq: 20, data: { title: '0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] } },
     ],
   })
   assert.equal(normalizeNow({
-    sessionTitle: fakeService({ title: 'Branch｜0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] }),
+    sessionTitle: fakeService({ title: '0105｜查询｜主题', source: { kind: 'user' }, messageSeqs: [] }),
   }, compliant.session, { log: () => {} }), undefined)
   assert.equal(compliant.appends.length, 0)
 
@@ -394,12 +394,12 @@ test('normalizeNow skips a compliant fork title but strips a stale (n)', () => {
     isSeeded: true,
     events: [
       { type: 'user/message', seq: 9, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '主题' }] } },
-      { type: 'session/title', seq: 20, data: { title: 'Branch｜0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
+      { type: 'session/title', seq: 20, data: { title: '0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] } },
     ],
   })
   assert.equal(normalizeNow({
-    sessionTitle: fakeService({ title: 'Branch｜0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
-  }, stale.session, { log: () => {} }), 'Branch｜0105｜查询｜主题')
+    sessionTitle: fakeService({ title: '0105｜查询｜主题 (1)', source: { kind: 'user' }, messageSeqs: [] }),
+  }, stale.session, { log: () => {} }), '0105｜查询｜主题')
   assert.deepEqual(stale.appends[0].data.messageSeqs, [9])
 })
 
@@ -472,7 +472,7 @@ test('applyNormalizer schedules an inherited fork title for a user event', async
   listener(session, { type: 'session/title', data: { source: { kind: 'user' } } })
   await new Promise((resolve) => setTimeout(resolve, 50))
   assert.equal(appends.length, 1)
-  assert.equal(state.current.title, 'Branch｜0105｜分析｜父标题')
+  assert.equal(state.current.title, '0105｜分析｜父标题')
   dispose()
 })
 
@@ -503,7 +503,7 @@ test('applyNormalizer normalizes an inherited fork title without the full settle
   listener(session, { type: 'session/title', data: { source: { kind: 'user' } } })
   await new Promise((resolve) => setTimeout(resolve, 30))
   assert.equal(appends.length, 1)
-  assert.equal(state.current.title, 'Branch｜0105｜分析｜父标题')
+  assert.equal(state.current.title, '0105｜分析｜父标题')
   dispose()
 })
 

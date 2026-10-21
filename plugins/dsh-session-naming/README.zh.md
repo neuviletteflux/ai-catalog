@@ -8,13 +8,13 @@
 |---|---|
 | Agent 工具 | 新增 `set_session_title`（当前会话）、`rename_session`（按 id 改任意会话）、只读的 `session_title_audit`，以及默认 dry-run 的 `session_title_backfill`。 |
 | 客户端 UI | 可选的 Session 行前分叉图标（client bundle 需要重启后加载）。 |
-| 自动规范化 | 监听 `session/title`，等自带摘要稳定后追加 `[Branch｜]MMDD｜类型｜目标`。 |
+| 自动规范化 | 监听 `session/title`，等自带摘要稳定后追加 `MMDD｜类型｜目标`；fork 由侧边栏徽标标识，标题不写前缀。 |
 
 社区插件，不是 DeepSeek 官方产品。
 
 | 项目 | 值 |
 |---|---|
-| 版本 | `0.5.0` |
+| 版本 | `0.6.0` |
 | DSH Host | `0.2.1-rc.2` 已验证 |
 | 状态 | experimental |
 | Node.js | 22.19+ 或 24+ |
@@ -24,8 +24,8 @@
 ## 命名规范
 
 ```text
-普通会话       MMDD｜类型｜目标
-分支（fork）   Branch｜MMDD｜类型｜目标
+会话           MMDD｜类型｜目标
+fork           MMDD｜类型｜目标             （侧边栏徽标标识）
 自动化运行     MMDD｜AUTO｜任务名称        （同日多次运行追加 -01、-02）
 ```
 
@@ -33,8 +33,8 @@
 - `类型` 取 `分析｜规划｜实施｜排障｜审计｜查询｜整理｜复盘｜AUTO`。
 - `AUTO` 专供自动化运行；规范化器不会推断出 `AUTO`。工具要求 `AUTO` 带 `seq`
   （生成 `-01`、`-02`），没有 `-NN` 的标题不算合规。
-- 预算取标题服务的 `maxTitleBytes`（桌面 bundle 当前为 80 字节）。`Branch｜`
-  前缀占 9 字节。
+- 预算取标题服务的 `maxTitleBytes`（桌面 bundle 当前为 80 字节）。标题不再花
+  9 字节写 `Branch｜` 前缀；fork 状态由 `parentSessionId` 与侧边栏徽标表示。
 
 ## 为什么不替换标题 provider
 
@@ -139,23 +139,23 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 
 `rename_session` 调用 Host 的 `sessionController.rename`（Web GUI 的
 `session.rename` remote 背后同一业务方法），因此可以改非活跃会话（由 Host 恢复后
-改名）。它读取投影缓存判断目标是否分支；缓存不可读时**不猜**，并在结果里说明未加
-前缀。
+改名）。它读取投影缓存判断目标是否分支并写进结果；旧的 `Branch｜` 前缀会被去掉，
+不再新增前缀。缓存不可读时**不猜**。
 
-`session_title_audit` 是只读工具：扫描投影缓存，报告合规率、类型分布、分叉缺
-`Branch｜`、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日同目标
-重复（父子/分叉同目标单独计数，不算重复）。它不写标题、会话日志或投影缓存。
+`session_title_audit` 是只读工具：扫描投影缓存，报告合规率、类型分布、遗留
+`Branch｜` 前缀、仍带 `(n)` 的分叉、无效类型前缀、缺 `-NN` 的 `AUTO`，以及同日
+同目标重复（父子/分叉同目标单独计数，不算重复）。它不写标题、会话日志或投影缓存。
 
 `session_title_backfill` 是历史标题的写入路径：默认 dry-run，返回所有不合规顶层
-会话的建议；现标题保留为目标，只规范化日期、类型、`Branch｜` 和末尾 `(n)`。
-`apply: true` 才通过 Host 的 `sessionController.rename` 写入；子代理、已合规标题、
+会话的建议；现标题保留为目标，只规范化日期、类型和末尾 `(n)`；旧的 `Branch｜`
+前缀会被去掉，不会重新加。`apply: true` 才通过 Host 的 `sessionController.rename` 写入；子代理、已合规标题、
 缺运行序号的 `AUTO`、缺 `createdAt` 的会话跳过。应用前先看建议列表。
 
 ### 分叉徽标（客户端半侧）
 
 `lib/client.js` 在 `sidebar.session.row.leading` 注册一个紧凑、带 aria 标签的分叉
-图标：仅当行的 `SessionSummary` 带 `parentSessionId` 且不是子代理时显示。它只是
-视觉辅助，持久标记仍是标题里的 `Branch｜` 前缀。客户端入口单独打包，替换已安装
+图标：仅当行的 `SessionSummary` 带 `parentSessionId` 且不是子代理时显示。它是
+标题行里**唯一**的分叉标记：父会话与 fork 的标题都保持 `MMDD｜类型｜目标`。客户端入口单独打包，替换已安装
 的包需要重启 App 才会加载新 bundle；客户端加载失败不会影响 Host 工具与规范化器。
 
 
@@ -179,11 +179,12 @@ dsh plugin --profile web add link:/path/to/ai-catalog/plugins/dsh-session-naming
 - 人工标题（非分叉的 `source.kind = "user"`，或已不再等于继承的 `父标题 (n)`
   的分叉标题）；
 - 子代理会话（`header.origin = "subagent"`）；
-- 已符合规范的标题（分叉要求带 `Branch｜` 且没有末尾 `(n)`）；
+- 已符合规范的标题（分叉也不写前缀，只要求没有末尾 `(n)`；fork 由徽标标识）；
 - 没有可引用人类消息 seq 的分叉；
 - 自己写的修订（防自触发）。
 
-分叉行为：继承标题会改写成 `Branch｜MMDD｜类型｜目标`，并去掉末尾 `(n)`。
+分叉行为：继承标题会改写成 `MMDD｜类型｜目标`（不写 `Branch｜`，fork 由徽标
+标识），并去掉末尾 `(n)`。
 分叉的继承标题本身已经稳定，因此不等待常规 `settleMs` 窗口，而是快速规范化。
 修订优先沿用被替换事件的 `messageSeqs`；继承标题的 `messageSeqs` 为空时，引用
 继承日志里的第一条人类消息。DSH 的不变式仍然成立：
@@ -247,7 +248,7 @@ dsh plugin --profile web remove dsh-session-naming
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 76 项 node:test
+npm test                      # 77 项 node:test
 npm pack --dry-run            # 查看实际打包文件
 cd ../..
 python3 scripts/validate_metadata.py

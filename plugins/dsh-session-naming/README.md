@@ -9,13 +9,13 @@ a prompt-only instruction. The plugin has two halves:
 |---|---|
 | Agent tools | Adds `set_session_title` (current session), `rename_session` (any session by id), read-only `session_title_audit`, and dry-run-first `session_title_backfill`. |
 | Client UI | Optional leading-seat fork icon on Session rows (requires a restart to load the client bundle). |
-| Automatic normalizer | Watches `session/title`, waits for the built-in summary to settle, then appends `[Branch｜]MMDD｜类型｜目标`. |
+| Automatic normalizer | Watches `session/title`, waits for the built-in summary to settle, then appends `MMDD｜类型｜目标`; forks are marked by the sidebar badge, not by a title prefix. |
 
 Community plugin, not a DeepSeek product.
 
 | Item | Value |
 |---|---|
-| Version | `0.5.0` |
+| Version | `0.6.0` |
 | DSH Host | `0.2.1-rc.2` verified |
 | Status | experimental |
 | Node.js | 22.19+ or 24+ |
@@ -25,8 +25,8 @@ Community plugin, not a DeepSeek product.
 ## The convention
 
 ```text
-ordinary session     MMDD｜类型｜目标
-branch (fork)        Branch｜MMDD｜类型｜目标
+session              MMDD｜类型｜目标
+fork                 MMDD｜类型｜目标             (sidebar badge marks the fork)
 automation run       MMDD｜AUTO｜任务名称        (repeat runs: -01, -02)
 ```
 
@@ -36,7 +36,8 @@ automation run       MMDD｜AUTO｜任务名称        (repeat runs: -01, -02)
   tool requires `seq` for `AUTO` (emitting `-01`, `-02`), and a title without
   `-NN` is not compliant.
 - The budget is the session-title service's `maxTitleBytes` (80 in the desktop
-  bundle). The branch prefix counts toward it (`Branch｜` is 9 bytes).
+  bundle). Titles no longer spend 9 bytes on a `Branch｜` prefix; the fork state
+  lives in `parentSessionId` and the sidebar badge.
 
 ## Why not replace the title provider?
 
@@ -147,19 +148,20 @@ by two independent checks:
 `rename_session` calls the Host's `sessionController.rename`, the same business
 method behind the Web GUI's `session.rename` remote, so it can rename inactive
 sessions (the Host resumes them). It reads the projection cache to decide
-whether the target is a branch; when the cache is unreadable it does **not**
-guess and reports that no prefix was added.
+whether the target is a branch and reports it in the result; a legacy
+`Branch｜` prefix is stripped, and no new prefix is added. When the cache is
+unreadable it does **not** guess.
 
 `session_title_audit` is read-only. It scans the projection cache and reports
-the compliance rate, type distribution, forks missing `Branch｜`, forks still
+the compliance rate, type distribution, legacy `Branch｜` prefixes, forks still
 carrying `(n)`, invalid type prefixes, `AUTO` titles without a run index, and
 same-day/same-goal duplicates (parent/fork pairs are reported separately from
 true duplicates). It never writes a title, session log, or projection cache.
 
 `session_title_backfill` is the write path for historical rows: by default it
 is a dry run that returns proposals for every non-compliant top-level session,
-keeping the current title as the goal and normalizing only the date, type,
-`Branch｜`, and `(n)`. `apply: true` writes each proposal through the Host
+keeping the current title as the goal and normalizing only the date, type, and
+trailing `(n)`; a legacy `Branch｜` prefix is stripped and never re-added. `apply: true` writes each proposal through the Host
 `sessionController.rename`; subagents, compliant titles, `AUTO` without a run
 index, and rows without a `createdAt` are skipped. Review the proposals before
 setting `apply`.
@@ -168,8 +170,9 @@ setting `apply`.
 
 `lib/client.js` registers a compact, aria-labeled fork icon in
 `sidebar.session.row.leading` for a row whose `SessionSummary` has a
-`parentSessionId` and is not a subagent. It is a visual aid only: the durable
-marker is still the `Branch｜` title prefix. The client entry is bundled
+`parentSessionId` and is not a subagent. It is the **only** fork marker in the
+title row: the title stays `MMDD｜类型｜目标` for both parents and forks. The
+client entry is bundled
 separately, so replacing an installed package needs an app restart to load a
 fresh generation; a client failure cannot break the host tools or normalizer.
 
@@ -198,13 +201,13 @@ The normalizer leaves these alone:
 - human titles (`source.kind = "user"` on a non-fork, or a fork title that is no
   longer the inherited `父标题 (n)`);
 - subagent sessions (`header.origin = "subagent"`);
-- titles that already match the convention (for a fork: `Branch｜…` and no
-  trailing `(n)`);
+- titles that already match the convention (for a fork: `MMDD｜类型｜目标` with no
+  trailing `(n)`; the sidebar badge marks the fork);
 - forks with no human message seq to cite;
 - its own revisions (prevents self-triggering).
 
-Fork behavior: the inherited title is rewritten to `Branch｜MMDD｜类型｜目标`
-and the trailing `(n)` is removed. A fork's inherited title is stable already,
+Fork behavior: the inherited title is rewritten to `MMDD｜类型｜目标` (no
+`Branch｜` prefix; the badge marks the fork) and the trailing `(n)` is removed. A fork's inherited title is stable already,
 so it is normalized without waiting for the normal `settleMs` window. The
 revision reuses the replaced event's `messageSeqs` when present; for an
 inherited fork title (empty refs) it cites the first human message in the
@@ -227,7 +230,7 @@ disables itself and naming keeps working.
 - No network requests, telemetry, or credentials.
 - The plugin does not write DSH data files directly. Tools call the title
   service; the normalizer appends one `session/title` event.
-- Branch detection reads `session_projcache` (read-only). Unreadable caches are
+- Fork detection reads `session_projcache` (read-only). Unreadable caches are
   reported as unknown, never guessed.
 - Uninstalling does not remove titles already written; they are ordinary
   session events.
@@ -277,7 +280,7 @@ instead. Titles already written stay as normal session history.
 
 ```bash
 cd plugins/dsh-session-naming
-npm test                      # 76 node:test cases
+npm test                      # 77 node:test cases
 npm pack --dry-run            # inspect the published file list
 cd ../..
 python3 scripts/validate_metadata.py

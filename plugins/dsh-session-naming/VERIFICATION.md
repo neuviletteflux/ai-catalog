@@ -8,8 +8,9 @@
 - 打包为 DSH Profile Bundle：`package.json` 声明 `dsh.bundle.patch`，包内
   `cordis.patch.yml` 用包名插入一行 `id: session-naming`。
 - 工具层完整移植：
-  - `set_session_title`：按会话创建日拼 `[Branch｜]MMDD｜类型｜目标`，校验词表、
-    `seq` 与字节预算；分叉会话自动加 `Branch｜`；返回服务实际接受的标题与字节数。
+  - `set_session_title`：按会话创建日拼 `MMDD｜类型｜目标`，校验词表、`seq` 与
+    字节预算；分叉不再加 `Branch｜`，由侧边栏徽标标识；返回服务实际接受的标题与
+    字节数。
   - `rename_session`：调用 Host 的 `sessionController.rename`（Web GUI 同一业务方法）；按投影缓存判断
     分支，缓存不可读时不猜。
   - 人工标题保护：`source.kind = "user"` 默认拒绝覆盖；分叉继承的
@@ -39,7 +40,7 @@ plugins/dsh-session-naming/
 ├── lib/client.js         # 浏览器半侧：Session 行分叉图标
 ├── lib/title-tools.js    # set_session_title / rename_session
 ├── lib/index.js          # 配置校验与插件组装
-├── tests/                # 76 项 node:test
+├── tests/                # 77 项 node:test
 ├── locale/               # en / zh 显示元数据
 ├── assets/icon.svg       # 原创图标
 ├── README.md / README.zh.md
@@ -55,7 +56,7 @@ cd /Users/lives/Github/ai-catalog/plugins/dsh-session-naming
 npm test
 ```
 
-结果：**76 项通过，0 失败**。覆盖：
+结果：**77 项通过，0 失败**。覆盖：
 
 - `compose.js`：创建日 `MMDD`、非法时间戳、词表、目标校验、`seq`、分支前缀、
   `AUTO` 序号、字节预算与 UTF-8 截断；
@@ -67,7 +68,7 @@ npm test
   分支判定（`isSeeded` / `inheritedEventCount` / `origin: subagent` / 投影缓存）、普通/分支/`raw`/`AUTO`
   标题、截断报告、预算报错、网关调用参数、缺失网关与空参数错误；
 - `audit.js`：投影缓存扫描、limit、合规/分支/无效前缀/AUTO 缺序号/重复统计；
-- `backfill.js`：proposeBackfill 的保留目标/补日期/类型/Branch 规则、dry-run、apply 写入、跳过条件；
+- `backfill.js`：proposeBackfill 的保留目标/补日期/类型/去旧前缀规则、dry-run、apply 写入、跳过条件；
 - `client.js`：`isFork` 谓词、行前 seat 注册、locale 字典与组件的显示/隐藏；
 - `index.js`：配置默认值、未知键、类型错误、单半边启用、挂载与 dispose。
 
@@ -78,7 +79,7 @@ npm test
 - 前缀剥离改为任意 `MMDD｜短类型｜`，覆盖词表外类型，`1020｜开发｜…` 不再把
   日期/类型带进目标。
 - `isBranchSession` / `isInheritedForkTitle` 用 `header.origin === "subagent"` 排除
-  子代理，避免给 subagent 加 `Branch｜`。
+  子代理，避免把 subagent 当成 fork。
 - 新增回归：8 条误判样例、未知类型前缀、subagent 分支；测试 51 → 54。
 
 ### P1a 分叉自动规范化（0.2.0–0.2.2）
@@ -92,15 +93,16 @@ npm test
 - fork 的继承标题不等待 `settleMs`，用 0ms 快速路径，避免冷 fork 在定时器触发前
   被回收。
 - 抽出 `lib/branch.js` 供工具与规范化器共用；测试 54 → 62。
-- 0.2.2 起 `rename_session` 对 fork 先去掉末尾 `(n)` 再加 `Branch｜`。
+- 0.2.2 起 `rename_session` 对 fork 先去掉末尾 `(n)`；0.6.0 起不再加
+  `Branch｜`，该前缀仅作为迁移期兼容输入被剥掉。
 - 0.2.1 修复 `rename_session`：直接调用 Host 的
   `sessionController.rename({ sessionId, title })`；旧的 `typertGateway.invoke`
   请求缺少 Peer 上下文，live 调用会报 `reading 'signal'`。
 - live 验证：把旧 fork `session-596df7d1…` 的标题设为
   `1016｜规划｜重构控制台页面方案 (1)` 后，规范化器日志记录
   `03:02:49.356Z … (user) → "Branch｜1016｜规划｜重构控制台页面方案"`；会话日志
-  seq 1841 的 provider 修订带 `messageSeqs: [8]`，投影缓存同步为
-  `Branch｜1016｜规划｜重构控制台页面方案`。
+  seq 1841 的 provider 修订带 `messageSeqs: [8]`。这是 0.2.x 的历史记录；0.6.0
+  起该 fork 标题已去掉 `Branch｜`，当前为 `1016｜规划｜重构控制台页面方案`。
 
 ### P1b AUTO 语义（0.3.0）
 
@@ -108,41 +110,44 @@ npm test
 - `isConventionTitle` 要求 `AUTO` 标题以 `-NN` 结尾；`0105｜AUTO｜任务` 不算合规。
 - `set_session_title` 在改名前拒绝 AUTO 缺 seq；测试覆盖。
 
-### P1c 只读审计（0.3.0 / 0.4.1）
+### P1c 只读审计（0.3.0 / 0.4.1 / 0.6.0）
 
-- 新增 `session_title_audit`：扫描投影缓存，统计合规率、类型分布、分叉缺
-  `Branch｜`、分叉带 `(n)`、无效类型前缀、AUTO 缺序号、重复；默认 200 条，
+- 新增 `session_title_audit`：扫描投影缓存，统计合规率、类型分布、遗留
+  `Branch｜` 前缀、分叉带 `(n)`、无效类型前缀、AUTO 缺序号、重复；默认 200 条，
   最多 1000；不写任何文件。
-- 0.4.1 把父子/分叉同目标单独计入 `forkPairs`，不再算真重复。
-- 用 `limit=500` 跑真实投影缓存：109 条顶层，36 条不合规；分叉缺 Branch 0，
-  分叉带 (n) 0，无效类型前缀 0，AUTO 缺序号 0，重复目标 0 组（另有 2 组
-  父子/分叉同目标）。
+- 0.4.1 把父子/分叉同目标单独计入 `forkPairs`，不再算真重复；0.6.0 起用
+  `isSeeded`/`inheritedEventCount` 判 fork，不再依赖标题前缀。
+- 用 `limit=500` 跑真实投影缓存：0.6.0 实测 **112 条顶层 / 112 合规（100%）**，
+  0 遗留 Branch、0 `(n)`、0 无效前缀、0 AUTO 缺序号、0 真重复（2 组父子/分叉同
+  目标），backfill proposals 0。
 - 0.4.3 修复审计输出 schema：`typeCounts.additionalProperties` 必须是布尔值；
   0.4.2 的对象形式会让 `ctx.tools.register` 抛 `JsonSchemaError`，中止整个 host
   插件（工具与规范化器都不加载）。已在 alpha web 重新启动验证 0.5.0 正常
   `loaded`，无 `1 entry did not activate` 警告。
 
-### P1c 历史回填（0.5.0）
+### P1c 历史回填（0.5.0 / 0.6.0）
 
 - 新增 `session_title_backfill`：默认 dry-run；现标题保留为目标，补 MMDD、类型、
-  fork 的 `Branch｜` 和去掉末尾 `(n)`；`apply: true` 才通过
-  `sessionController.rename` 写入。
+  去掉末尾 `(n)`；0.6.0 起不再补 `Branch｜`，旧前缀作为迁移兼容被剥掉；
+  `apply: true` 才通过 `sessionController.rename` 写入。
 - dry-run（`limit=500`）：扫描 205 条缓存，生成 **36 条建议**，0 跳过；
   子代理、已合规标题、AUTO 缺序号、缺 `createdAt` 的条目会跳过。
 - 2026-10-21 已应用：`session_title_backfill { limit: 500, apply: true }` 分两批
   （中断后 20 条，重试 16 条）全部写入，0 失败；随后 audit 为
-  **112 条顶层 / 112 合规（100%）/ 0 不合规**，分叉缺 Branch、`(n)`、无效前缀、
+  **112 条顶层 / 112 合规（100%）/ 0 不合规**，遗留 Branch、`(n)`、无效前缀、
   AUTO 缺序号均为 0。
 - 手工修正 5 条：`1001 | 方案 | ...` 的 ASCII 前缀、`命令行重命名文件夹`、
   `修改OpenWrt终端字体大小`、`推荐安装...吗`、`添加插件市场来源` 的类型/目标。
 - 仍剩 1 组 3 条同名测试会话（`0930｜分析｜Reply with exactly the two`）和 2 组
   父子/分叉同目标；它们格式合规，只是审计的重复提示。
+- 0.6.0 把 4 条历史 fork 标题去掉 `Branch｜` 前缀，改为 badge-only；清理了一条
+  `[frok]` 手写前缀。当前 112/112 合规、0 遗留前缀。
 
 ### P2 客户端分叉徽标（0.4.0 / 0.4.2）
 
 - `lib/client.js` 在 `sidebar.session.row.leading` 注册 15px 分叉图标；条件是
-  `parentSessionId` 存在且 `origin !== "subagent"`；只是视觉辅助，标题仍保留
-  `Branch｜`。
+  `parentSessionId` 存在且 `origin !== "subagent"`。0.6.0 起它是标题行里**唯一**
+  的 fork 标识，标题不再写 `Branch｜`。
 - 0.4.2 补上 `@deepseek-ai/dsh-client-ui-renderer` 依赖，与 primary-session 徽标一致。
 - 已做 mock 单测：谓词、seat 注册、locale、显示/隐藏；**尚未在真实 UI 视觉验证**。
 - client bundle 需要重启 App 后加载；Host 工具/规范化器不受影响。
